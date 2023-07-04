@@ -7,7 +7,7 @@ import GEStatus
 import numpy as np
 class GEScraper:
     def __init__(self):
-        self
+        self.status = GEStatus()
     ''' '''
     def scraper_convert_to_numerical(self,value):
         if "M" in value:
@@ -46,8 +46,11 @@ class GEScraper:
                 if item["current_price"] != np.Nan:
                     price_change = item["current_price"] /  new_price
                     if not np.isnan(item['current_holding']) and not np.isnan(item['initial_price']):
-                        returns = (item['current_holding'] * item['initial_price']) / (item['current_holding'] * price_change)
-               if price_change and item['alert']     
+                        returns = (item['current_holding'] * item['initial_price']) / (item['current_holding'] * price_change)    
+                if price_change and item["current_price"] and item['alert_threshold'] and price_change >= item['alert_threshold']:
+                    self.status.add_formatted_alert(item["name"], item["current_price"], price_change. returns,item['current_holding'] )
+                else:
+                    self.status.add_formatted_info(item["name"], item["current_price"], price_change. returns,item['current_holding'] )
                         
                     
             

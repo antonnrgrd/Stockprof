@@ -32,7 +32,7 @@ class GEScrapeConfig:
         if not os.path.exists("gescraper_config"):
             os.makedirs("gescraper_config")
         os.chdir("gescraper_config")
-        with open('data.json', 'w') as f:
+        with open('meta_data.json', 'w') as f:
             json.dump({"email": email, "error_state": False}, f)
         ge_items = pd.DataFrame(columns = ['name', 'url', 'current_price', 'initial_price', 'current_holding', 'alert_threshold'])  
         ge_items.to_csv('items.csv')
@@ -78,10 +78,8 @@ class GEScrapeConfig:
 def main():
     config = GEScrapeConfig()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', action="store_true")
     parser.add_argument('--email', action="store", required=False, default=None, nargs=1)
-    parser.add_argument('--additem', action="store_true")
-    parser.add_argument('--item', action="store", required=False, default=False, nargs="+")
+
    # parser.add_argument('--item', action="store", required=False, default=np.NAN, nargs=1)
     parser.add_argument('--name', action="store", required=False, default=None, nargs=1)
     parser.add_argument('--url', action="store", required=False, default=None, nargs=1)
@@ -89,6 +87,11 @@ def main():
     parser.add_argument('--initprice', action="store", required=False, default=np.NAN, nargs=1)
     parser.add_argument('--curhold', action="store", required=False, default=np.NAN, nargs=1)
     parser.add_argument('--threshold', action="store", required=False, default=np.NAN, nargs=1)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--update', action="store_true", required=False, default=np.NAN, nargs=1)
+    group.add_argument('--additem', action="store_true")
+    group.add_argument('--item', action="store", required=False, default=False, nargs="+")
+    group.add_argument('--config', action="store_true")
     args = parser.parse_args()
     #config.setup_extract_provided_item_info(args)
     if args.config:
@@ -106,6 +109,7 @@ def main():
                 config.config_add_item_list(args.item)
         else:
             print('Errror, provide at least the url and name of the item')
+    
          
             
 

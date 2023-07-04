@@ -7,7 +7,11 @@ class GEStatus:
         self.notable_events = []
     def add_formatted_info(self, name, price, price_change=None, returns=None, current_holding=None):
         if price_change:      
-            self.formatted_info.append("Item: {iname} , current price : {price}, daily price change : {change}, returns {returns}  ".format(iname = name, price=price, change=price_change, returns=returns))
+            self.formatted_info.append("Item: {iname} , current price : {price}, daily price change : {change}, returns {returns}  \n".format(iname = name, price=price, change=price_change, returns=returns))
         else:
-            self.formatted_info.append("Item: {iname} , current price : {price}  ".format(iname = name, price=price))
-    def add_formatted_alert(self, name, price, price_change=None, earnings=None,current_holding=None):        
+            self.formatted_info.append("Item: {iname} , current price : {price}  \n".format(iname = name, price=price))
+    def add_formatted_alert(self, name, price, price_change=None, returns = None, earnings=None,current_holding=None):
+        if price_change:      
+            self.formatted_info.append("Item: {iname}, current price : {price}, daily price change : {change}, returns {returns} \n".format(iname = name, price=price, change=price_change, returns=returns))
+        else:
+            self.formatted_info.append("Item: {iname}, changing rapidly in price. Its current price : {price}  \n".format(iname = name, price=price))        
