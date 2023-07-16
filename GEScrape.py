@@ -3,11 +3,13 @@ import json
 import os
 import pandas as pd
 import re
-import GEStatus
+from GEStatus import *
 import numpy as np
+from GEMailer import GEMailer
 class GEScraper:
     def __init__(self):
         self.status = GEStatus()
+        self.mailer = GEMailer()
     ''' '''
     def scraper_convert_to_numerical(self,value):
         if "M" in value:
@@ -17,7 +19,7 @@ class GEScraper:
         else:
             return int(value)
 
-    def check_items_daily(self):
+    def check_items(self):
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]
         os.chdir("{home}/gescraper_config".format(home=userhome))
@@ -51,6 +53,7 @@ class GEScraper:
                     self.status.add_formatted_alert(item["name"], item["current_price"], price_change. returns,item['current_holding'] )
                 else:
                     self.status.add_formatted_info(item["name"], item["current_price"], price_change. returns,item['current_holding'] )
+        self.mailer.ge_mailer_mail_update(self.status)
                         
                     
             

@@ -5,7 +5,7 @@ import json
 import platform
 import pandas as pd
 import numpy as np
-
+from GEScrape import *
 attr_index_mapping = {'name' : 0, 'url' : 1 , 'curprice': 2, 'initprice': 3, 'curhold': 4, 'threshold': 5}
 class GEScrapeConfig:
     ''' '''
@@ -77,6 +77,7 @@ class GEScrapeConfig:
 
 def main():
     config = GEScrapeConfig()
+    scraper = GEScraper()
     parser = argparse.ArgumentParser()
     parser.add_argument('--email', action="store", required=False, default=None, nargs=1)
 
@@ -88,7 +89,7 @@ def main():
     parser.add_argument('--curhold', action="store", required=False, default=np.NAN, nargs=1)
     parser.add_argument('--threshold', action="store", required=False, default=np.NAN, nargs=1)
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('--update', action="store_true", required=False, default=np.NAN, nargs=1)
+    group.add_argument('--update_items', action="store_true")
     group.add_argument('--additem', action="store_true")
     group.add_argument('--item', action="store", required=False, default=False, nargs="+")
     group.add_argument('--config', action="store_true")
@@ -109,6 +110,8 @@ def main():
                 config.config_add_item_list(args.item)
         else:
             print('Errror, provide at least the url and name of the item')
+    elif args.update:
+        scraper.check_items()
     
          
             
