@@ -8,6 +8,8 @@ import numpy as np
 from GEScrape import *
 attr_index_mapping = {'name' : 0, 'url' : 1 , 'curprice': 2, 'initprice': 3, 'curhold': 4, 'threshold': 5}
 class GEScrapeConfig:
+    
+    def
     ''' '''
     def setup_extract_provided_item_info(self,args):
         new_item_info = np.array([None, None, np.NAN, np.NAN, np.NAN, np.NAN ])
@@ -29,22 +31,22 @@ class GEScrapeConfig:
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]
         os.chdir(userhome)
-        if not os.path.exists("gescraper_config"):
-            os.makedirs("gescraper_config")
-        os.chdir("gescraper_config")
+        if not os.path.exists("stockscraper_config"):
+            os.makedirs("stockscraper_config")
+        os.chdir("stockscraper_config")
         with open('meta_data.json', 'w') as f:
             json.dump({"email": email, "error_state": False}, f)
-        ge_items = pd.DataFrame(columns = ['name', 'url', 'current_price', 'initial_price', 'current_holding', 'alert_threshold'])  
+        ge_items = pd.DataFrame(columns = ['ticker', 'url', 'current_price', 'initial_price', 'current_holding', 'alert_threshold'])  
         ge_items.to_csv('items.csv')
         
     def config_add_item_list(self, new_item_list=None, args = None):
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]
         os.chdir(userhome)
-        if not os.path.exists("gescraper_config") or not os.path.exists("gescraper_config/items.csv"):
+        if not os.path.exists("stockscraper_config") or not os.path.exists("stockscraper_config/items.csv"):
             print('Couldn\'t find settings folder. Please run a config first')
             return
-        os.chdir("gescraper_config")
+        os.chdir("stockscraper_config")
         df = pd.read_csv("items.csv",index_col=0)
         if new_item_list:
             new_item_info = np.array([None, np.NAN, np.NAN, np.NAN, np.NAN ])
