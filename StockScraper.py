@@ -25,16 +25,17 @@ class StockScraper:
         summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'}).text
         extracted_currency = re.search(currency_regex, summary).group(2)
         extracted_price = re.search(present_price_regex, summary).group(2)
-        print(extracted_price)
+       # print(extracted_price)
         extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(3)
-        print(extracted_dividend_yield)
+        #print(extracted_dividend_yield)
         target_price = re.search(one_year_target_price_regex, summary).group(2)
-        print(target_price)
+        #print(target_price)
         
         stock_info["currency"] = extracted_currency
-        stock_info["current_price"] = extracted_price
+        stock_info["current_price"] = float(extracted_price)
         statistics = r.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}",headers={'User-Agent': 'Custom'}).text
         financials = r.get(f"https://finance.yahoo.com/quote/{ticker}/financials?p={ticker}",headers={'User-Agent': 'Custom'}).text
+        return stock_info
     def scraper_convert_to_numerical(self,value):
         if "M" in value:
             return int(value) * 1000000
@@ -42,44 +43,33 @@ class StockScraper:
             return int(value) * 1000000000
         else:
             return int(value)
-
+    def scraper_update_ticker(self,row,df,updated_info): 
+        df.at[row["Unnamed: 0"],'currency']=updated_info["currency"]
     def check_items(self):
-        
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]
         os.chdir("{home}/stockscraper_config".format(home=userhome))
-        ge_items = None
-    #    try:      
-        
-
-        print(os.listdir())
-        ge_items = pd.read_csv("items.csv",index_col=0)
-        #except:
-        #      print('error')
-       #       return  
-        for item in ge_items.to_dict(orient="records"):
+        tickers = pd.read_csv("items.csv")
+        print(tickers)
+        for item in tickers.to_dict(orient="records"):
             print(item)
-            ge_info = r.get(item["url"])
-            if ge_info.ok:
-                response_info = ge_info.text
-                '''To my recollection, Jagex sadly does not provide an API to neatly extract the GE prices
-                to we are forced to manually find the price in the response HTML. This is not the prettiest regex
-                but hey, it works.'''
-                current_price = re.search("(<h3>Current Guide Price <span title=')([0-9]+)", response_info).group(2)
-                item_name = re.search("<h2>(.+)<\/h2>", response_info).group(1)
-                new_price = self.scraper_convert_to_numerical(current_price)
-                price_change = None
-                returns = None
-                if item["current_price"] != np.Nan:
-                    price_change = item["current_price"] /  new_price
-                    if not np.isnan(item['current_holding']) and not np.isnan(item['initial_price']):
-                        returns = (item['current_holding'] * item['initial_price']) / (item['current_holding'] * price_change)    
-                if price_change and item["current_price"] and item['alert_threshold'] and price_change >= item['alert_threshold']:
-                    self.status.add_formatted_alert(item["name"], item["current_price"], price_change. returns,item['current_holding'] )
-                else:
-                    self.status.add_formatted_info(item["name"], item["current_price"], price_change. returns,item['current_holding'] )
-        self.mailer.ge_mailer_mail_update(self.status)
-                        
+            ticker_info = self.scraper_all_item_info(item["ticker"])
+            price_change = None
+            returns = None
+            if item["current_price"] != np.NaN:
+                price_change = item["current_price"] /  ticker_info["current_price"]
+                if not np.isnan(item['holding']) and not np.isnan(item['initial_price']):
+                    returns = (item['holding'] * item['initial_price']) / (item['current_holding'] * price_change)    
+            if price_change and item["current_price"] and item['alert_threshold'] and price_change >= item['alert_threshold']:
+                self.status.add_formatted_alert(item["ticker"], item["current_price"], price_change. returns,item['holding'] )
+            else:
+                self.status.add_formatted_info(item["ticker"], item["current_price"], price_change, returns,item['holding'] )
+            self.scraper_update_ticker(item, tickers,ticker_info)
+        #self.mailer.stock_mailer_mail_update(self.status)
+        '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
+        we would for each iteration append a coulumn to the df when writing it out'''
+        tickers.to_csv("items.csv",index=False)
+                    
                     
             
                 
