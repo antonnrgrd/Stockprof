@@ -6,14 +6,16 @@ import re
 from StockStatus import *
 import numpy as np
 from StockMailer import StockMailer
-from bs4 import BeautifulSoup
+
 ''' 
 BeautifulSoup does some of the heavy work for us but what we 
 '''
 currency_regex = "( Currency in )(([A-Z])+)"
 present_price_regex = "(data-pricehint=\"2\" value=\")(([0-9]|\.)+)"
-dividend_yield_regex = "(\"DIVIDEND_AND_YIELD-value\">)(.+) \(([0-9]+\.[0-9]+%)"
-one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9]+\.[0-9]+)"
+dividend_yield_regex = "(\"DIVIDEND_AND_YIELD-value\">)(.+) \(([0-9]+\.[0-9]+%|N\/A)"
+one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9]+\.[0-9]+|N\/A)"
+sector_regex = "(Sector\(s\)<\/span>:\s<span class=\"Fw\(600\)\">)(([a-zA-Z]|\s)+)(<\/span>)"
+industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;&]+)(<\/span>)"
 class StockScraper:
     def __init__(self):
         self.status = StockStatus()
@@ -23,16 +25,21 @@ class StockScraper:
     def scraper_all_item_info(self,ticker):
         stock_info = {}
         summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'}).text
+        profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers={'User-Agent': 'Custom'}).text
         extracted_currency = re.search(currency_regex, summary).group(2)
         extracted_price = re.search(present_price_regex, summary).group(2)
-       # print(extracted_price)
         extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(3)
-        #print(extracted_dividend_yield)
         target_price = re.search(one_year_target_price_regex, summary).group(2)
-        #print(target_price)
         
+        extracted_sector = re.search(sector_regex, profile).group(2)
+        extracted_industry = re.search(industry_regex, profile).group(2).replace("&amp;", "&")
+        
+        stock_info["sector"] = extracted_sector
+        stock_info["industry"] = extracted_industry
         stock_info["currency"] = extracted_currency
         stock_info["current_price"] = float(extracted_price)
+        stock_info["target_price"] = target_price
+        stock_info["dividend_yield"] = extracted_dividend_yield
         statistics = r.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}",headers={'User-Agent': 'Custom'}).text
         financials = r.get(f"https://finance.yahoo.com/quote/{ticker}/financials?p={ticker}",headers={'User-Agent': 'Custom'}).text
         return stock_info
@@ -45,6 +52,7 @@ class StockScraper:
             return int(value)
     def scraper_update_ticker(self,row,df,updated_info): 
         df.at[row["Unnamed: 0"],'currency']=updated_info["currency"]
+        df.at[row["Unnamed: 0"],'current_price']= updated_info["current_price"] if updated_info["current_price"] != "N/A" else np.NaN
     def check_items(self):
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]

@@ -78,6 +78,7 @@ def main():
     parser.add_argument('--password', action="store", required=False, default=None)
     parser.add_argument('--recipients', action="store", required=False, default=None)
     parser.add_argument('--ticker', action="store", required=False, default=None, type=str)
+    parser.add_argument('--reference_currency', action="store", required=False, default=None, type=str)
     '''Default values are set to undef, rather than N/A, because if you do, then when pandas 
     reads it in, it will intepret it as NaN, causing incompatability issues'''
     parser.add_argument('--currency', action="store", required=False, default="undef")
@@ -85,18 +86,24 @@ def main():
     parser.add_argument('--initial_price', action="store", required=False, default=np.NAN)
     parser.add_argument('--holding', action="store", required=False, default=np.NAN)
     parser.add_argument('--alert_threshold', action="store", required=False, default=np.NAN)
+    parser.add_argument('--overwrite', action="store_true", default=False)
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--update_items', action="store_true")
     group.add_argument('--additem', action="store_true")
     group.add_argument('--config', action="store_true")
     args = parser.parse_args()
     if args.config:
-        if args.email:
-            print('Setting up script')
-            config.config_setup(args.email,args.password,args.recipients)
-            print('Setup complete')
+        userhome = os.path.expanduser('~')          
+        user = os.path.split(userhome)[-1]
+        if os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv") and args.overwrite or not os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
+            if args.email:
+                print('Setting up script')
+                config.config_setup(args.email,args.password,args.recipients)
+                print('Setup complete')
+            else:
+                print('Error, attempted to config pyexchange without an email')
         else:
-            print('Error, attempted to config pyexchange without an email')
+            print('Config file already found to be present. Run the config with --overwrite to overwrite the existing configuration')
     elif args.additem:
         '''Conditionaly requiring arguments is a tad bit tricky, based on discussions on StackOverflow
         This approach is the dumbest, but the case is so simple that it will do just fine'''
