@@ -20,7 +20,11 @@ industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;
 '''Behold, the ugliest regex known to man! the reason why this is so unsightly is that if we want to extract the location of the company
 we in the html code need to look for the adress, ending with the country in question. But there are so many ways you can specify an adress, with umlaut,
 hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
-country_regex = "(class=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z-\.\s]+)"
+country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)((<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)|(<br\/>)([^<>]+)(<br\/>))"
+
+#"(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)"
+
+#"(class=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z-\.\s]+)"
 class StockScraper:
     def __init__(self):
         self.status = StockStatus()
@@ -39,7 +43,9 @@ class StockScraper:
         extracted_sector = re.search(sector_regex, profile).group(2)
         extracted_industry = re.search(industry_regex, profile).group(2).replace("&amp;", "&")
         
-        extracted_country = re.search(country_regex, profile).group(6)
+        extracted_country = re.search(country_regex, profile).groups()
+
+        extracted_country = extracted_country[-2] if extracted_country[-2] != None else extracted_country[-5] 
         
         stock_info["country"] = extracted_country
         stock_info["sector"] = extracted_sector
