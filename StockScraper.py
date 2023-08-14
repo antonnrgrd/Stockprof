@@ -13,9 +13,14 @@ BeautifulSoup does some of the heavy work for us but what we
 currency_regex = "( Currency in )(([A-Z])+)"
 present_price_regex = "(data-pricehint=\"2\" value=\")(([0-9]|\.)+)"
 dividend_yield_regex = "(\"DIVIDEND_AND_YIELD-value\">)(.+) \(([0-9]+\.[0-9]+%|N\/A)"
-one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9]+\.[0-9]+|N\/A)"
+one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9,]+\.[0-9]+|N\/A)"
 sector_regex = "(Sector\(s\)<\/span>:\s<span class=\"Fw\(600\)\">)(([a-zA-Z]|\s)+)(<\/span>)"
 industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;&]+)(<\/span>)"
+#country_regex = "(<\/h3><div\sclass=\"Mb\(25px\)\"><p\sclass=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">(<br\/>)(.+)<br\/>)([a-zA-Z]+)(<br\/>)"
+'''Behold, the ugliest regex known to man! the reason why this is so unsightly is that if we want to extract the location of the company
+we in the html code need to look for the adress, ending with the country in question. But there are so many ways you can specify an adress, with umlaut,
+hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
+country_regex = "(class=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z-\.\s]+)"
 class StockScraper:
     def __init__(self):
         self.status = StockStatus()
@@ -34,6 +39,9 @@ class StockScraper:
         extracted_sector = re.search(sector_regex, profile).group(2)
         extracted_industry = re.search(industry_regex, profile).group(2).replace("&amp;", "&")
         
+        extracted_country = re.search(country_regex, profile).group(6)
+        
+        stock_info["country"] = extracted_country
         stock_info["sector"] = extracted_sector
         stock_info["industry"] = extracted_industry
         stock_info["currency"] = extracted_currency
