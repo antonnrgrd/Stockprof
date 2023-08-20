@@ -21,7 +21,7 @@ class StockScrapeConfig:
             pass
         elif os.lower() == "linux":
             pass
-    def config_setup(self, email,password,recipients):
+    def config_setup(self, email,password,recipients,ref_currency):
         '''Makes some assumptions that aren't always true. There is no constraint that requires the username to appear in the homedir path on Linux. 
         It just happens to be the case most of the time, but a sysadmin can set a user's homedir to whatever they want '''
         userhome = os.path.expanduser('~')          
@@ -30,18 +30,18 @@ class StockScrapeConfig:
         if not os.path.exists("stockscraper_config"):
             os.makedirs("stockscraper_config")
         os.chdir("stockscraper_config")
-        with open('meta_data.json', 'w') as f:
-            json.dump({"email": email, "password":password, "error_state": False},f)
+        with open('config_info.json', 'w') as f:
+            json.dump({"email": email, "password":password, "error_state": False, 'ref_currency':ref_currency.upper()},f)
         tickers = pd.DataFrame(columns = ['ticker','currency', 'current_price', 'initial_price', 'holding', 'alert_threshold'])
         tickers.to_csv('items.csv')
     
     def config_extract_provided_values(self, args_as_dict):
         
-        tikr_values = [[np.NaN, "undef", np.NaN, np.NaN, np.NaN, np.NaN]]
+        tikr_values = [[np.NaN, "undef", np.NaN, np.NaN, np.NaN, np.NaN,np.NaN,"undef","undef", "undef"]]
         for argument in  args_as_dict:
            if argument in attr_index_mapping:
               tikr_values[0][attr_index_mapping[argument]] = args_as_dict[argument]
-        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold'])      
+        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country'])      
         return tikr_values
                     
         
@@ -87,6 +87,7 @@ def main():
     parser.add_argument('--holding', action="store", required=False, default=np.NAN)
     parser.add_argument('--alert_threshold', action="store", required=False, default=np.NAN)
     parser.add_argument('--overwrite', action="store_true", default=False)
+    parser.add_argument('--ref_currency', action="store", default=False)
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--update_items', action="store_true")
     group.add_argument('--additem', action="store_true")
@@ -98,7 +99,7 @@ def main():
         if os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv") and args.overwrite or not os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
             if args.email:
                 print('Setting up script')
-                config.config_setup(args.email,args.password,args.recipients)
+                config.config_setup(args.email,args.password,args.recipients,args.ref_currency)
                 print('Setup complete')
             else:
                 print('Error, attempted to config pyexchange without an email')

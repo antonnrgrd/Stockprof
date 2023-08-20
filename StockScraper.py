@@ -38,7 +38,7 @@ class StockScraper:
         extracted_currency = re.search(currency_regex, summary).group(2)
         extracted_price = re.search(present_price_regex, summary).group(2)
         extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(3)
-        target_price = re.search(one_year_target_price_regex, summary).group(2)
+        exracted_target_price = re.search(one_year_target_price_regex, summary).group(2)
         
         extracted_sector = re.search(sector_regex, profile).group(2)
         extracted_industry = re.search(industry_regex, profile).group(2).replace("&amp;", "&")
@@ -51,9 +51,9 @@ class StockScraper:
         stock_info["sector"] = extracted_sector
         stock_info["industry"] = extracted_industry
         stock_info["currency"] = extracted_currency
-        stock_info["current_price"] = float(extracted_price)
-        stock_info["target_price"] = target_price
-        stock_info["dividend_yield"] = extracted_dividend_yield
+        stock_info["current_price"] = float(extracted_price.replace(",", "")) if extracted_price != "N/A" else np.NaN
+        stock_info["target_price"] = float(exracted_target_price.replace(",", "")) if exracted_target_price != "N/A" else np.NaN
+        stock_info["dividend_yield"] = extracted_dividend_yield if extracted_dividend_yield != "N/A" else np.NaN
         statistics = r.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}",headers={'User-Agent': 'Custom'}).text
         financials = r.get(f"https://finance.yahoo.com/quote/{ticker}/financials?p={ticker}",headers={'User-Agent': 'Custom'}).text
         return stock_info
@@ -65,8 +65,13 @@ class StockScraper:
         else:
             return int(value)
     def scraper_update_ticker(self,row,df,updated_info): 
+        df.at[row["Unnamed: 0"],'country']=updated_info["country"]
         df.at[row["Unnamed: 0"],'currency']=updated_info["currency"]
+        df.at[row["Unnamed: 0"],'sector']=updated_info["sector"]
+        df.at[row["Unnamed: 0"],'industry']=updated_info["industry"]
+        df.at[row["Unnamed: 0"],'target_price']=updated_info["target_price"]
         df.at[row["Unnamed: 0"],'current_price']= updated_info["current_price"] if updated_info["current_price"] != "N/A" else np.NaN
+        df.at[row["Unnamed: 0"],'target_price']= updated_info["target_price"] 
     def check_items(self):
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]
@@ -81,7 +86,7 @@ class StockScraper:
             if item["current_price"] != np.NaN:
                 price_change = item["current_price"] /  ticker_info["current_price"]
                 if not np.isnan(item['holding']) and not np.isnan(item['initial_price']):
-                    returns = (item['holding'] * item['initial_price']) / (item['current_holding'] * price_change)    
+                    returns = (item['holding'] * item['initial_price']) / (item['holding'] * price_change)    
             if price_change and item["current_price"] and item['alert_threshold'] and price_change >= item['alert_threshold']:
                 self.status.add_formatted_alert(item["ticker"], item["current_price"], price_change. returns,item['holding'] )
             else:
