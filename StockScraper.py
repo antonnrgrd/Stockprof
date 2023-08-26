@@ -10,7 +10,7 @@ from StockMailer import StockMailer
 ''' 
 BeautifulSoup does some of the heavy work for us but what we 
 '''
-currency_regex = "( Currency in )(([A-Z])+)"
+currency_regex = "( Currency in )(([A-Za-z])+)"
 present_price_regex = "(data-pricehint=\"2\" value=\")(([0-9]|\.)+)"
 dividend_yield_regex = "(\"DIVIDEND_AND_YIELD-value\">)(.+) \(([0-9]+\.[0-9]+%|N\/A)"
 one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9,]+\.[0-9]+|N\/A)"
@@ -50,7 +50,7 @@ class StockScraper:
         stock_info["country"] = extracted_country
         stock_info["sector"] = extracted_sector
         stock_info["industry"] = extracted_industry
-        stock_info["currency"] = extracted_currency
+        stock_info["currency"] = extracted_currency.upper()
         stock_info["current_price"] = float(extracted_price.replace(",", "")) if extracted_price != "N/A" else np.NaN
         stock_info["target_price"] = float(exracted_target_price.replace(",", "")) if exracted_target_price != "N/A" else np.NaN
         stock_info["dividend_yield"] = extracted_dividend_yield if extracted_dividend_yield != "N/A" else np.NaN
