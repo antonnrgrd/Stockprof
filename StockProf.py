@@ -27,13 +27,15 @@ class StockProfiler:
                 self.title = f"Portfolio_report_dated_{present_date}({counter})"
                                   
 
-  
+    def profiler_write_information_section(self, latex_report):
+        latex_report. write(""" \\section*{Information used}""")
     def profiler_write_preamble(self, latex_report):
         latex_report.write(
           """
         \\documentclass{article}
         \\usepackage{graphicx} % Required for inserting images
         \\usepackage{tikz}
+        \\usepackage{multirow}
         \\usetikzlibrary{positioning,arrows}
         \\usetikzlibrary{arrows.meta}
         \\title{Portfolio report}
@@ -53,18 +55,43 @@ class StockProfiler:
         latex_report.write("""\\end{document} """)
     def profiler_write_currency_conversion_info(self,latex_report):
         reference_currency = self.reference_currency
-        
-        
-        latex_report.write("""\\begin{{table}}[!h]
-                            \\begin{{center}}
-                            \\begin{{tabular}}{{||c ||}} 
-                             \hline
-                             Reference currency : {}  \\\ [0.5ex] 
-                             \hline\hline
-                          """.format(reference_currency))
-        for currency, factor in self.conversion_factors:
-            latex_report.write("""{}:{}  \\\ 
-                               \hline """.format(currency, factor))
+        '''We are not interested in writing the conversion factor out for the reference currency, since it is trivially 1 '''
+        self.conversion_factors.pop(self.reference_currency, None)
+        latex_report.write("""
+                           \\subsection*{Conversion factors} """)
+        if len(self.conversion_factors) <=5:
+            latex_report.write("""\\begin{{table}}[!h]
+                                \\begin{{center}}
+                                \\begin{{tabular}}{{||c ||}} 
+                                 \hline
+                                 Reference currency : {}  \\\ [0.5ex] 
+                                 \hline\hline
+                              """.format(reference_currency))
+            for currency, factor in self.conversion_factors.items():
+                latex_report.write("""{} : {}  \\\ 
+                                   \hline """.format(currency, factor))
+        else:
+            latex_report.write(
+                """
+                \\begin{{table}}[!h]
+                \\begin{{center}}
+                \\begin{{tabular}}{{ |c||c|  }}
+                 \\hline
+                 \\multicolumn{{2}}{{|c|}}{{ Reference currency : {} }} \\\\
+                 \\hline
+                 \\hline
+                """
+                .format(self.reference_currency))
+            iterable_factors = iter(self.conversion_factors.items())
+            for currency_factor in iterable_factors:
+                first_factor, second_factor = currency_factor, next(iterable_factors, None)
+                if second_factor != None:
+                    latex_report.write("""{} : {} & {} : {}  \\\ 
+                                   \hline """.format(first_factor[0], first_factor[1],second_factor[0], second_factor[1]))
+                else:
+                     latex_report.write("""{} : {} &   \\\ 
+                                        
+                                   \hline """.format(first_factor[0], first_factor[1]))
         latex_report.write("""
                            \\end{tabular}
                             \\caption{{Conversion factors for reference currency.}}
@@ -74,14 +101,14 @@ class StockProfiler:
     def profiler_derive_information(self, tickers,reference_currency):
         self.reference_currency = reference_currency
         currencies = tickers.currency.unique()
-        '''We are not interested in the conversion ratio for the reference currency, so we 
-        disregard the reference currency, if there is any'''
+        '''We are no interested in getting the conversion factor for the reference currency as we know it is 1 '''
         currencies = currencies[currencies != reference_currency]
         for currency in currencies:
             conversion_factor_text = r.get(f"https://wise.com/us/currency-converter/{currency}-to-{reference_currency}-rate?amount=1").text
             factor = float(re.search(ex_rate_regex,conversion_factor_text).group(2).replace(",",""))
             self.conversion_factors[currency]=factor
-        ''' '''
+        '''We have the conversion factor of the reference currency, since it allow us to skimp on a lot of logic
+        when converting the currencies to the reference currency'''
         self.conversion_factors[reference_currency] = 1
     def profiler_get_as_ref_currency(self, stock_info):
         if stock_info["currency"] in self.conversion_factors:
@@ -162,6 +189,8 @@ class StockProfiler:
             userhome = os.path.expanduser('~') 
             with open("{}\\stockscraper_config\\{}.tex".format(userhome, self.title), 'w') as report:
                 self.profiler_write_preamble(report)
+                self.profiler_write_information_section(report)
+                self.profiler_write_currency_conversion_info(report)
                 self.profiler_write_ending(report)
                  
 

@@ -6,16 +6,24 @@ import re
 from StockStatus import *
 import numpy as np
 from StockMailer import StockMailer
-
-''' 
-BeautifulSoup does some of the heavy work for us but what we 
-'''
-currency_regex = "( Currency in )(([A-Za-z])+)"
-present_price_regex = "(data-pricehint=\"2\" value=\")(([0-9]|\.)+)"
+import time
+#data-test="ASK-value">12,960.00 
+#currency_regex = "( Currency in )(([A-Za-z])+)"
+#(Currency in )([A-Za-z])+ \([0-9,]+\.[0-9]+ [A-Za-z]+\)
+#currency_regex = "(Currency in )(([A-Za-z])+)"
+#currency_regex = "( Currency in )(([A-Za-z])+)|(Currency in )([A-Za-z])+ \([0-9,]+\.[0-9]+ [A-Za-z]+\)"
+currency_regex = "(Currency\sin\s)([A-Za-z]+)\s\([0-9,]+\.[0-9]+\s[A-Z]+\)|(Currency\sin\s)([A-Z]+)"
+currency_subregex_first_case = "(Currency\sin\s)([A-Za-z]+)\s\([0-9,]+\.[0-9]+\s([A-Z]+)\)"
+currency_subregex_second_case = "(Currency\sin\s)([A-Z]+)"
+'''Regex for getting current price is suprisingly tricky to get correct. Lots of false positives, the commented-out ones
+were old candidates, saved just in case'''
+#present_price_regex = "(data-pricehint=\"2\" value=\")(([0-9]|\.)+)"
+#present_price_regex = "(data-test=\"BID-value\">)([0-9\.,]+)"
+present_price_regex = "(FIN_TICKER_PRICE&quot;:&quot;)([0-9\.,]+)(&quot;)"
 dividend_yield_regex = "(\"DIVIDEND_AND_YIELD-value\">)(.+) \(([0-9]+\.[0-9]+%|N\/A)"
 one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9,]+\.[0-9]+|N\/A)"
 sector_regex = "(Sector\(s\)<\/span>:\s<span class=\"Fw\(600\)\">)(([a-zA-Z]|\s)+)(<\/span>)"
-industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;&]+)(<\/span>)"
+industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;&,]+)(<\/span>)"
 #country_regex = "(<\/h3><div\sclass=\"Mb\(25px\)\"><p\sclass=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">(<br\/>)(.+)<br\/>)([a-zA-Z]+)(<br\/>)"
 '''Behold, the ugliest regex known to man! the reason why this is so unsightly is that if we want to extract the location of the company
 we in the html code need to look for the adress, ending with the country in question. But there are so many ways you can specify an adress, with umlaut,
@@ -33,9 +41,31 @@ class StockScraper:
     @classmethod
     def scraper_all_item_info(self,ticker):
         stock_info = {}
+        summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'})
+        profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers={'User-Agent': 'Custom'})
+        if not summary.ok:
+            failed_attempts = 0
+            while not summary.ok and failed_attempts < 60:
+                summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'})
+                failed_attempts = failed_attempts + 1
+                time.sleep(failed_attempts)
+        if not profile.ok:
+            failed_attempts = 0
+            while not summary.ok and failed_attempts < 60:
+                profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers={'User-Agent': 'Custom'})
+                failed_attempts = failed_attempts + 1 
+                time.sleep(failed_attempts)
+        if not profile.ok or not summary.ok:
+            print(profile.reason + str(profile.status_code))
+            print(summary.reason + str(summary.status_code))
         summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'}).text
         profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers={'User-Agent': 'Custom'}).text
-        extracted_currency = re.search(currency_regex, summary).group(2)
+        '''Annoyingly, some currencies are listed in subunits e.g pennies and cents instead of pounds and dollars
+        this regex counters this case'''
+        if "(" in re.search(currency_regex, summary).group(0):
+            extracted_currency = re.search(currency_subregex_first_case, re.search(currency_regex, summary).group(0)).group(3)
+        else:        
+            extracted_currency = re.search(currency_subregex_second_case, summary).group(2)
         extracted_price = re.search(present_price_regex, summary).group(2)
         extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(3)
         exracted_target_price = re.search(one_year_target_price_regex, summary).group(2)
@@ -77,20 +107,19 @@ class StockScraper:
         user = os.path.split(userhome)[-1]
         os.chdir("{home}/stockscraper_config".format(home=userhome))
         tickers = pd.read_csv("items.csv")
-        print(tickers)
         for item in tickers.to_dict(orient="records"):
             print(item)
             ticker_info = self.scraper_all_item_info(item["ticker"])
             price_change = None
             returns = None
-            if item["current_price"] != np.NaN:
-                price_change = item["current_price"] /  ticker_info["current_price"]
-                if not np.isnan(item['holding']) and not np.isnan(item['initial_price']):
-                    returns = (item['holding'] * item['initial_price']) / (item['holding'] * price_change)    
-            if price_change and item["current_price"] and item['alert_threshold'] and price_change >= item['alert_threshold']:
-                self.status.add_formatted_alert(item["ticker"], item["current_price"], price_change. returns,item['holding'] )
-            else:
-                self.status.add_formatted_info(item["ticker"], item["current_price"], price_change, returns,item['holding'] )
+        #    if item["current_price"] != np.NaN:
+         #       price_change = item["current_price"] /  ticker_info["current_price"]
+         #       if not np.isnan(item['holding']) and not np.isnan(item['initial_price']):
+         #           returns = (item['holding'] * item['initial_price']) / (item['holding'] * price_change)    
+         #   if price_change and item["current_price"] and item['alert_threshold'] and price_change >= item['alert_threshold']:
+         #       self.status.add_formatted_alert(item["ticker"], item["current_price"], price_change. returns,item['holding'] )
+         #   else:
+         #       self.status.add_formatted_info(item["ticker"], item["current_price"], price_change, returns,item['holding'] )
             self.scraper_update_ticker(item, tickers,ticker_info)
         #self.mailer.stock_mailer_mail_update(self.status)
         '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
