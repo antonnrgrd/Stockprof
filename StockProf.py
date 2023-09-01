@@ -4,8 +4,7 @@ import datetime
 import requests as r
 import re
 import json
-import numpy as np
-from functools import reduce
+import math
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
 
@@ -25,8 +24,39 @@ class StockProfiler:
             while os.path.exists("{}\\stockscraper_config\\{}.tex".format(userhome, self.title)):
                 counter = counter + 1
                 self.title = f"Portfolio_report_dated_{present_date}({counter})"
-                                  
-
+    def profiler_write_distribution_section(self, latex_report):
+        latex_report.write("""
+                           \\section*{Distribution of holdings}
+                           """
+            )
+                              
+    def profiler_write_pchart(self, latex_report, currency_weighting,column,caption, remaining_weighting=None):
+        latex_report.write("""
+                           \\begin{figure}
+                           \\begin{tikzpicture}
+                           \\pie{
+        """)
+        
+        '''tikz expect the value in the pie chart to be in the range 0-100, representing the percentage but the way we compute the
+        weight it is between 0-1, so we multiply by 100 to ensure it has this property. Furthermore, tikz expect the values to sum abou 100
+        or close to, in order to render the pie chart correctly, so we round them up to nudgde it in that direction, at the cost of some accuracy'''
+        for index in range (len(currency_weighting)-1):
+            latex_report.write("""{} / {}  , """.format(math.ceil(currency_weighting.at[index,'weighting'] * 100) ,currency_weighting.at[index,column] ))
+        if remaining_weighting != None:
+            latex_report.write("""{} / Other """.format(math.ceil(remaining_weighting * 100)))
+        else:
+            latex_report.write(""", """)
+            latex_report.write("""
+                               
+                               {} / {} 
+                               
+                               """.format(currency_weighting.iloc[-1]["weighting"],currency_weighting['currency'].iloc[-1]["currency"] ))
+        latex_report.write("""
+                        }}
+                     \\end{{tikzpicture}}
+                     \\caption{{ {} }}
+                     \\end{{figure}}
+                           """.format(caption))
     def profiler_write_information_section(self, latex_report):
         latex_report. write(""" \\section*{Information used}""")
     def profiler_write_preamble(self, latex_report):
@@ -186,9 +216,19 @@ class StockProfiler:
             biggest_return_p =  tickers.loc[tickers['returns'].idxmax()]
             biggest_loss_return_p =  tickers.loc[tickers['returns'].idxmin()]
             
+            
+
+            
             userhome = os.path.expanduser('~') 
             with open("{}\\stockscraper_config\\{}.tex".format(userhome, self.title), 'w') as report:
                 self.profiler_write_preamble(report)
+                self.profiler_write_distribution_section(report)
+                if len(currency_holdings) > 5:
+                    biggest_currency_holdings = currency_holdings.nlargest(5, columns=['weighting']).reset_index()
+                    remaining_weight = 1 - biggest_currency_holdings['weighting'].sum()
+                    self.profiler_write_pchart(report, biggest_currency_holdings,"currency", "Distribution of currencies", remaining_weight)
+                else:
+                    self.profiler_write_pchart(report, currency_holdings,"currency","Distribution of currencies")
                 self.profiler_write_information_section(report)
                 self.profiler_write_currency_conversion_info(report)
                 self.profiler_write_ending(report)
