@@ -38,22 +38,33 @@
 \subsection*{}
 \section*{Distribution of investments}
 \subsection*{Distribution by currency and nationality}
-\begin{figure}
-\begin{tikzpicture}
- 
-\pie{
-	22.97 / Los Angeles Lakers,
-    22.97/Boston Celtics,
-    8.11/Golden State Warriors,
-    8.11/Chicago Bulls,
-    6.76/San Antonio Spurs,
-    31.07/Other Teams
-    }
- 
-\end{tikzpicture}
-\caption{A type of chart that it is generally recommended not to use}
-\end{figure}
 
+\begin{center}
+
+
+\begin{tikzpicture}[auto=left] 
+\node[circle] at (-3,-3) {Distribution of currencies in holdings};
+\node[circle] at (4,-3) {Distribution of nationality in holdings};
+\pie[
+radius=2,
+pos={-3,0}
+]{
+	22.97 / USD,
+    22.97/SEK,
+    8.11/SGD,
+    8.11/CNPY,
+    6.76/HKD,
+    31.07/EUR
+    }
+    
+\pie[
+    radius=2,
+    pos={4,0},
+]{10/A, 20/B, 30/C, 40/D}
+
+
+\end{tikzpicture}
+\end{center}
 \subsection*{Distribution by sector and industry}    
 
 \section*{Information used}
