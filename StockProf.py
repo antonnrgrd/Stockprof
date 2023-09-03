@@ -5,6 +5,7 @@ import requests as r
 import re
 import json
 import math
+from decimal import *
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
 
@@ -24,41 +25,62 @@ class StockProfiler:
             while os.path.exists("{}\\stockscraper_config\\{}.tex".format(userhome, self.title)):
                 counter = counter + 1
                 self.title = f"Portfolio_report_dated_{present_date}({counter})"
-    def profiler_write_distribution_section(self, latex_report):
+    def profiler_sanitize_ticker_data(self, tickers):
+        '''These values are present in various values in the dataframe. THey give issues with rendering the reports
+        so we will rehave to replace them with something it can render'''
+        tickers["industry"] = tickers['industry'].str.replace('&', '\&')
+        tickers["industry"] = tickers['industry'].str.replace('—', '-')
+        '''According to the all-known stackoverflow '''
+        getcontext().prec = 128
+        tickers['current_price'] = tickers['current_price'].apply(str) 
+        tickers['current_price'] = tickers['current_price'].apply(Decimal)
+        
+    def profiler_write_section(self, latex_report, title):
         latex_report.write("""
-                           \\section*{Distribution of holdings}
-                           """
+                           \\subsection*{{{}}}
+                           """.format(title)
             )
-                              
-    def profiler_write_pchart(self, latex_report, currency_weighting,column,caption, remaining_weighting=None):
+    def profiler_write_subsection(self, latex_report, title):
         latex_report.write("""
-                           \\begin{figure}
-                           \\begin{tikzpicture}
-                           \\pie{
-        """)
+                           \\section*{{{}}}
+                           """.format(title)
+            )
+    def profiler_write_tikz_begin(self, latex_report, optional_info=None):
+        if optional_info != None:
+            latex_report.write("""
+                           \\begin{tikzpicture}""" + optional_info)
+        else:
+            latex_report.write("""
+                           \\begin{tikzpicture}""")
+                
+            
+        
+                           
+    def profiler_write_tikz_end(self, latex_report):
+         latex_report.write("""
+                          \\end{tikzpicture}""")
+    def profiler_write_pchart(self, latex_report, currency_weighting,column,radius, x_pos, y_pos, remaining_weighting=None):
+        latex_report.write("""
+                           \\pie[radius={radius}, pos= {{{x_pos},{y_pos}}}]{{
+        """.format(radius=radius, x_pos= x_pos, y_pos = y_pos))
         
         '''tikz expect the value in the pie chart to be in the range 0-100, representing the percentage but the way we compute the
         weight it is between 0-1, so we multiply by 100 to ensure it has this property. Furthermore, tikz expect the values to sum abou 100
         or close to, in order to render the pie chart correctly, so we round them up to nudgde it in that direction, at the cost of some accuracy'''
         for index in range (len(currency_weighting)-1):
-            latex_report.write("""{} / {}  , """.format(math.ceil(currency_weighting.at[index,'weighting'] * 100) ,currency_weighting.at[index,column] ))
+            latex_report.write("""{fraction} / {value}  , """.format(fraction=math.ceil(currency_weighting.at[index,'weighting'] * 100) ,value=currency_weighting.at[index,column] ))
         if remaining_weighting != None:
-            latex_report.write("""{} / Other """.format(math.ceil(remaining_weighting * 100)))
+            latex_report.write("""{fraction} / Other """.format(fraction=math.ceil(remaining_weighting * 100)))
         else:
             latex_report.write(""", """)
             latex_report.write("""
                                
                                {} / {} 
                                
-                               """.format(currency_weighting.iloc[-1]["weighting"],currency_weighting['currency'].iloc[-1]["currency"] ))
-        latex_report.write("""
-                        }}
-                     \\end{{tikzpicture}}
-                     \\caption{{ {} }}
-                     \\end{{figure}}
-                           """.format(caption))
-    def profiler_write_information_section(self, latex_report):
-        latex_report. write(""" \\section*{Information used}""")
+                               """.format(currency_weighting.iloc[-1]["weighting"],currency_weighting[column].iloc[-1][column] ))
+        latex_report.write(""" 
+                           }
+                           """)
     def profiler_write_preamble(self, latex_report):
         latex_report.write(
           """
@@ -181,6 +203,7 @@ class StockProfiler:
             with open(f"{userhome}\\stockscraper_config\\config_info.json") as f:
                 config_info = json.load(f)
                 self.profiler_derive_information(tickers, config_info["ref_currency"])
+            self.profiler_sanitize_ticker_data(tickers)
             tickers['currency_amount'] = tickers.holding * tickers.current_price
             
             currency_holdings = tickers.groupby(['currency'])['currency_amount'].sum().reset_index()
@@ -211,6 +234,7 @@ class StockProfiler:
             country_holdings["currency_amount"] = country_holdings["currency"].map(self.conversion_factors).mul(country_holdings["currency_amount"]) 
             country_holdings = country_holdings.rename(columns={'currency_amount': 'own_currency'})
             country_weighting = country_holdings.groupby(['country'])['own_currency'].sum().reset_index()
+            country_weighting["weighting"] = country_weighting["own_currency"] / total_holding_own_currency
             
             tickers['returns'] = tickers.initial_price / tickers.current_price
             biggest_return_p =  tickers.loc[tickers['returns'].idxmax()]
@@ -222,14 +246,43 @@ class StockProfiler:
             userhome = os.path.expanduser('~') 
             with open("{}\\stockscraper_config\\{}.tex".format(userhome, self.title), 'w') as report:
                 self.profiler_write_preamble(report)
-                self.profiler_write_distribution_section(report)
+                self.profiler_write_section(report, "Distribution of holdings")
+                self.profiler_write_subsection(report, "Distribution of currencies and countries")
+                self.profiler_write_tikz_begin(report,"""[auto=left] 
+\\node[circle] at (-3,-3) {Distribution of currencies in holdings};
+\\node[circle] at (4,-3) {Distribution of nationality in holdings};""")
                 if len(currency_holdings) > 5:
                     biggest_currency_holdings = currency_holdings.nlargest(5, columns=['weighting']).reset_index()
                     remaining_weight = 1 - biggest_currency_holdings['weighting'].sum()
-                    self.profiler_write_pchart(report, biggest_currency_holdings,"currency", "Distribution of currencies", remaining_weight)
+                    self.profiler_write_pchart(report, biggest_currency_holdings,"currency",2, -3, 0, remaining_weight)
                 else:
-                    self.profiler_write_pchart(report, currency_holdings,"currency","Distribution of currencies")
-                self.profiler_write_information_section(report)
+                    self.profiler_write_pchart(report, currency_holdings,"currency",2, -3, 0)
+                if len(country_holdings) > 5:
+                     biggest_country_holdings = country_weighting.nlargest(5, columns=['weighting']).reset_index()
+                     remaining_weight = 1 - biggest_country_holdings['weighting'].sum()
+                     self.profiler_write_pchart(report, biggest_country_holdings,"country",2, 4, 0, remaining_weight)
+                else:
+                    self.profiler_write_pchart(report, biggest_country_holdings,"country",2, 4, 0)
+                self.profiler_write_tikz_end(report)
+                self.profiler_write_subsection(report, "Distribution of sectors and industries")
+                
+                self.profiler_write_tikz_begin(report,"""[auto=left] 
+\\node[circle] at (-3,-3) {Distribution of sector in holdings};
+\\node[circle] at (4,-3) {Distribution of industry in holdings};""")
+                if len(sector_holdings) > 5:
+                    biggest_sector_holdings = sector_weighting.nlargest(5, columns=['weighting']).reset_index()
+                    remaining_weight = 1 - biggest_sector_holdings['weighting'].sum()
+                    self.profiler_write_pchart(report, biggest_sector_holdings,"sector",2, -3, 0, remaining_weight)
+                else:
+                    self.profiler_write_pchart(report, currency_holdings,"currency",2, -3, 0)
+                if len(industry_holdings) > 5:
+                     biggest_industry_holdings = industry_weighting.nlargest(5, columns=['weighting']).reset_index()
+                     remaining_weight = 1 - biggest_country_holdings['weighting'].sum()
+                     self.profiler_write_pchart(report, biggest_industry_holdings,"industry",2, 4, 0, remaining_weight)
+                else:
+                    self.profiler_write_pchart(report, biggest_industry_holdings,"country",2, 4, 0)
+                self.profiler_write_tikz_end(report)
+                self.profiler_write_section(report, "Information used to produce report")                
                 self.profiler_write_currency_conversion_info(report)
                 self.profiler_write_ending(report)
                  
