@@ -7,6 +7,8 @@
 \title{Portfolio report}
 \usepackage{pgf-pie}  
 \usepackage{subcaption}
+\usetikzlibrary {datavisualization} 
+\usepackage{pgfplots}
 \date{\today}
 \begin{document}
 \maketitle
@@ -35,7 +37,87 @@
  \draw[-{Triangle[width=18pt,length=8pt]}, line width=8pt, color=red](11,-2.6) -- (11, -3.2);       
  \node[circle] at (10,-4) {Stock with highest negative returns in DKK};        
 \end{tikzpicture}
-\subsection*{}
+\subsection*{Performance of portfolio}
+\subsubsection*{1-year returns}
+\tikz \datavisualization [scientific axes,
+                          x axis={attribute=date, length=2.5cm, ticks={minor steps between steps=3}, label=x-axis},
+                          y axis={attribute=returns, label=y-axis},
+                          label=One Year returns,
+                          visualize as line]
+  data {
+    date, returns
+    1, 100
+    2, 200
+    3, 200
+    4, 250
+    5, 150
+    6, 400
+    7, 150
+    8, 190
+    9, 200
+    10, 250
+    11, 300
+    12, 290
+  };
+  
+ \begin{tikzpicture}
+%\draw[step=1cm,gray,very thin] (-2,-2) grid (6,6);
+\begin{axis}[
+		title={Returns on investment over a one year period},
+       % axis on top,% ----
+        grid = both,
+        xtick={1,2,3,4,5,6,7,8,9,10,11,12},
+         xticklabels={$Jan.$,$Feb.=2$},
+    		ytick={0,10,20,60,80,100,120},
+        ylabel= Value of holding,
+    		xlabel= Month,
+        scale only axis,
+        enlargelimits=false,
+       % xmin=0,
+       % xmax=96,
+       % ymin=0,
+       % ymax=96,
+        axis equal=true
+        ]
+         \addplot [color=red] coordinates { %medium
+       (1,16.8) 
+       (2,15.6) 
+       (3,16.8) 
+       (4,16.5)
+       (5,16.5)
+       (6,16.5)
+       (7,16.5)
+       (8,16.5)
+       (9,16.5)
+       (10,18.5)
+       (11,20.5)
+       (12,19.5)
+    };
+\end{axis}
+\end{tikzpicture} 
+\subsubsection{3-year returns}
+Plotting from data:
+
+\begin{tikzpicture}
+\begin{axis}[
+    title={Temperature dependence of CuSO\(_4\cdot\)5H\(_2\)O solubility},
+    xlabel={Temperature [\textcelsius]},
+    ylabel={Solubility [g per 100 g water]},
+    xmin=0, xmax=100,
+    ymin=0, ymax=120,
+    xtick={0,20,40,60,80,100},
+    ytick={0,20,40,60,80,100,120},
+    legend pos=north west,
+    ymajorgrids=true,
+    grid style=dashed,
+]
+
+
+  
+    
+\end{axis}
+\end{tikzpicture}
+\subsubsection{5-year returns}
 \section*{Distribution of investments}
 \subsection*{Distribution by currency and nationality}
 
@@ -64,7 +146,20 @@ pos={-3,0}
 
 
 \end{tikzpicture}
+
 \end{center}
+\subsection*{Most heavily weighed stocks}
+\begin{table}[!h]
+\begin{center}
+
+
+\begin{enumerate}\centering
+\item AAPL: 40 \%
+
+\item ASML - 32 \%
+\end{enumerate}
+\end{center}
+\end{table}
 \subsection*{Distribution by sector and industry}    
 
 \section*{Information used}
