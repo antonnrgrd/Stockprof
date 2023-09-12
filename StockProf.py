@@ -26,14 +26,11 @@ class StockProfiler:
                 counter = counter + 1
                 self.title = f"Portfolio_report_dated_{present_date}({counter})"
     def profiler_sanitize_ticker_data(self, tickers):
-        '''These values are present in various values in the dataframe. THey give issues with rendering the reports
+        '''These values are present in various values in the dataframe. They give issues with rendering the reports
         so we will rehave to replace them with something it can render'''
         tickers["industry"] = tickers['industry'].str.replace('&', '\&')
         tickers["industry"] = tickers['industry'].str.replace('—', '-')
-        '''According to the all-known stackoverflow '''
-        getcontext().prec = 128
-        tickers['current_price'] = tickers['current_price'].apply(str) 
-        tickers['current_price'] = tickers['current_price'].apply(Decimal)
+
         
     def profiler_write_section(self, latex_report, title):
         latex_report.write("""
@@ -93,6 +90,7 @@ class StockProfiler:
         \\title{Portfolio report}
         \\usepackage{pgf-pie}  
         \\usepackage{subcaption}
+        \\usetikzlibrary {datavisualization} 
         \\date{Dated """ +  self.present_date + """ } """ 
         +
         
@@ -195,7 +193,8 @@ class StockProfiler:
         
     def profiler_write_ending(self,latex_report):
          latex_report.write("""\end{document}""")
-   # @classmethod
+    def profiler_write_enumerate(self, latex_report, ):
+        pass
     def profiler_generate_report_info(self):
         userhome = os.path.expanduser('~')          
         if os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
@@ -282,7 +281,10 @@ class StockProfiler:
                 else:
                     self.profiler_write_pchart(report, biggest_industry_holdings,"country",2, 4, 0)
                 self.profiler_write_tikz_end(report)
-                self.profiler_write_section(report, "Information used to produce report")                
+                self.profiler_write_subsection(report, "Top stock by weighting")   
+                
+                self.profiler_write_section(report, "Information used to produce report")
+                self.profiler_write_subsection(report, "Currency conversion rates")                
                 self.profiler_write_currency_conversion_info(report)
                 self.profiler_write_ending(report)
                  
