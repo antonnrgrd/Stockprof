@@ -63,11 +63,14 @@
  \begin{tikzpicture}
 %\draw[step=1cm,gray,very thin] (-2,-2) grid (6,6);
 \begin{axis}[
-		title={Returns on investment over a one year period},
+		title={Returns on investment over a one year period\footnote{Values shown}},
        % axis on top,% ----
         grid = both,
-        xtick={1,2,3,4,5,6,7,8,9,10,11,12},
-         xticklabels={$Jan.$,$Feb.=2$},
+        xtick={3,6,9},
+        xticklabels={March., July,Sept.},
+        extra x ticks={1,2,3,4,5,6,7,8,9,10,11,12},
+    		extra x tick style={
+        xticklabel={}},
     		ytick={0,10,20,60,80,100,120},
         ylabel= Value of holding,
     		xlabel= Month,
