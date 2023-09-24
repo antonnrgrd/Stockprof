@@ -9,12 +9,6 @@ from StockScraper import *
 import sys
 attr_index_mapping = {'ticker':0,'currency':1, 'current_price':2, 'initial_price':3, 'holding':4,'alert_threshold':5}
 class StockScrapeConfig:
-    
-
-        
-
-
-                
     def setup_scraper_script(self):
         os = platform.system()
         if os.lower() == "windows":
@@ -25,15 +19,16 @@ class StockScrapeConfig:
         '''Makes some assumptions that aren't always true. There is no constraint that requires the username to appear in the homedir path on Linux. 
         It just happens to be the case most of the time, but a sysadmin can set a user's homedir to whatever they want '''
         userhome = os.path.expanduser('~')          
-        user = os.path.split(userhome)[-1]
         os.chdir(userhome)
         if not os.path.exists("stockscraper_config"):
             os.makedirs("stockscraper_config")
         os.chdir("stockscraper_config")
         with open('config_info.json', 'w') as f:
-            json.dump({"email": email, "password":password, "error_state": False, 'ref_currency':ref_currency.upper()},f)
+            json.dump({"email": email, "password":password, "error_state": False, 'ref_currency':ref_currency.upper(), "row_id": None},f)
         tickers = pd.DataFrame(columns = ['ticker','currency', 'current_price', 'initial_price', 'holding', 'alert_threshold'])
         tickers.to_csv('items.csv')
+        holding_value = pd.DataFrame(columns = ['holding_value'])
+        holding_value.to_csv('holding_values.csv',index=False)
     
     def config_extract_provided_values(self, args_as_dict):
         
