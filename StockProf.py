@@ -5,14 +5,15 @@ import requests as r
 import re
 import json
 import math
-from decimal import *
+from StockScraper import *
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
 
 class StockProfiler:
-    def __init__(self):
+    def __init__(reference_currency):
+        self.scraper = StockScraper()
         counter = 1
-        self.reference_currency = None
+        self.reference_currency = reference_currency
         self.conversion_factors = {}
         self.regions = None
         present_date = datetime.datetime.now()
@@ -201,7 +202,7 @@ class StockProfiler:
             tickers =  pd.read_csv(f"{userhome}\\stockscraper_config\\items.csv")
             with open(f"{userhome}\\stockscraper_config\\config_info.json") as f:
                 config_info = json.load(f)
-                self.profiler_derive_information(tickers, config_info["ref_currency"])
+                self.scraper.scraper_get_currency_conv_factors(tickers, config_info["ref_currency"])
             self.profiler_sanitize_ticker_data(tickers)
             tickers['currency_amount'] = tickers.holding * tickers.current_price
             

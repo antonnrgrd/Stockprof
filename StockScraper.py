@@ -7,6 +7,7 @@ from StockStatus import *
 import numpy as np
 from StockMailer import StockMailer
 import time
+import datetime
 #data-test="ASK-value">12,960.00 
 #currency_regex = "( Currency in )(([A-Za-z])+)"
 #(Currency in )([A-Za-z])+ \([0-9,]+\.[0-9]+ [A-Za-z]+\)
@@ -30,15 +31,35 @@ we in the html code need to look for the adress, ending with the country in ques
 hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
 country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)((<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)|(<br\/>)([^<>]+)(<br\/>))"
 
+ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
+
 #"(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)"
 
 #"(class=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z-\.\s]+)"
 class StockScraper:
     def __init__(self):
-        self.status = StockStatus()
-        self.mailer = StockMailer()
-    ''' '''
-    @classmethod
+        self.conversion_factors = {}
+    def scraper_derive_total_holding_val(self, tickers, reference_currency):
+        '''Assumes value of holding is up to date'''
+        present_date = datetime.datetime.now()
+        present_date = present_date.strftime("%d-%m-%Y")
+        userhome = os.path.expanduser('~')  
+        os.chdir("{home}/stockscraper_config".format(home=userhome))
+        self.scraper_get_currency_conv_factors(tickers, self.conversion_factors, reference_currency)
+        holding_values = pd.read_csv("holding_values.csv")
+        tickers["currency_amount"] = tickers["current_price"] * tickers["holding"]
+        tickers["currency_amount"] = tickers["currency"].map(self.conversion_factors).mul(tickers["currency_amount"]) 
+        holding_value_present = tickers.groupby(['ticker'])['currency_amount'].sum().sum()
+        holding_values.loc[present_date] = [holding_value_present]
+        holding_values.to_csv("holding_values.csv",index=False)
+    def scraper_get_currency_conv_factors(self,tickers, conversion_factors, reference_currency):
+        currencies = tickers.currency.unique()
+        '''We are no interested in getting the conversion factor for the reference currency as we know it is 1 '''
+        currencies = currencies[currencies != reference_currency]
+        for currency in currencies:
+            conversion_factor_text = r.get(f"https://wise.com/us/currency-converter/{currency}-to-{reference_currency}-rate?amount=1").text
+            factor = float(re.search(ex_rate_regex,conversion_factor_text).group(2).replace(",",""))
+            conversion_factors[currency]=factor
     def scraper_all_item_info(self,ticker):
         stock_info = {}
         summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'})
