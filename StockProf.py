@@ -26,13 +26,28 @@ class StockProfiler:
             while os.path.exists("{}\\stockscraper_config\\{}.tex".format(userhome, self.title)):
                 counter = counter + 1
                 self.title = f"Portfolio_report_dated_{present_date}({counter})"
+    def profiler_write_returns(self, latex_report, returns, time_frame):
+        latex_report.write
+    
+    def profiler_write_returns_monthly(self, returns):
+        previous_monthly_returns = returns.iloc[0:30]
+    def profiler_write_returns_yearly(self):
+        pass
+    def profiler_write_returns_five_yearly(self)
+        
     def profiler_sanitize_ticker_data(self, tickers):
         '''These values are present in various values in the dataframe. They give issues with rendering the reports
         so we will rehave to replace them with something it can render'''
         tickers["industry"] = tickers['industry'].str.replace('&', '\&')
         tickers["industry"] = tickers['industry'].str.replace('—', '-')
 
-        
+    def profiler_write_section_handler(latex_report, title, section_type):     
+        latex_report.write("""
+                    \\{}*{{{}}}
+                    """.format(section_type, title)
+
+            
+    
     def profiler_write_section(self, latex_report, title):
         latex_report.write("""
                            \\subsection*{{{}}}

@@ -8,6 +8,7 @@ import numpy as np
 from StockMailer import StockMailer
 import time
 import datetime
+import random
 #data-test="ASK-value">12,960.00 
 #currency_regex = "( Currency in )(([A-Za-z])+)"
 #(Currency in )([A-Za-z])+ \([0-9,]+\.[0-9]+ [A-Za-z]+\)
@@ -39,27 +40,59 @@ ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 class StockScraper:
     def __init__(self):
         self.conversion_factors = {}
-    def scraper_derive_total_holding_val(self, tickers, reference_currency):
+    def scraper_generate_dummy_returns(self):
+        userhome = os.path.expanduser('~')
+        returns = pd.read_csv(f"{userhome}/stockscraper_config/holding_values.csv")          
+        base = datetime.datetime.today()
+        date_list = date_list = [(base - datetime.timedelta(days=x)).strftime("%d-%m-%Y") for x in range(365 * 5)]
+        return_values = [1000000]
+        for i in range((365 * 5) -1):
+            return_values.append(return_values[-1] * random.uniform(1.0001, 1.001))
+       
+        generated_holding_values = pd.DataFrame(return_values, index=date_list, columns=["holding_value"])
+
+        returns = pd.concat([returns, generated_holding_values])
+        '''This assumes that we generate values on an empty returns df. Pandas does not handle empty dataframes very well and among other
+        things, setting the name of the index column seems to have no effect on empty dataframes, so we have to postpone it to here'''
+        returns.index.name = "date"
+        returns.to_csv(f"{userhome}/stockscraper_config/returns.csv")
+    def scraper_get_daily_returns(self):
         '''Assumes value of holding is up to date'''
         present_date = datetime.datetime.now()
         present_date = present_date.strftime("%d-%m-%Y")
         userhome = os.path.expanduser('~')  
         os.chdir("{home}/stockscraper_config".format(home=userhome))
-        self.scraper_get_currency_conv_factors(tickers, self.conversion_factors, reference_currency)
-        holding_values = pd.read_csv("holding_values.csv")
+        tickers = pd.read_csv("items.csv")
+        with open(f"{userhome}\\stockscraper_config\\config_info.json") as f:
+                config_info = json.load(f)
+                self.scraper_get_currency_conv_factors(tickers, self.conversion_factors, config_info["ref_currency"])
+        '''Okay so this is a bit of a headache, we read in with index 0 as the first column is the date column, i,e our index
+        but in the edge case we have no value, the result is an empty df so we need to re-create it.'''
+        returns = pd.read_csv("returns.csv",index_col=0)
+        #print(returns)
+        if 'holding_value' not in returns.columns:
+            returns = pd.DataFrame(columns = ['holding_value'])
         tickers["currency_amount"] = tickers["current_price"] * tickers["holding"]
         tickers["currency_amount"] = tickers["currency"].map(self.conversion_factors).mul(tickers["currency_amount"]) 
         holding_value_present = tickers.groupby(['ticker'])['currency_amount'].sum().sum()
-        holding_values.loc[present_date] = [holding_value_present]
-        holding_values.to_csv("holding_values.csv",index=False)
+        '''To save the date index, we use a hack where we first use the date as the index, then reset the index,
+        making it a column so we can write it out without any issue to csv and then skip writing out the integer indexes'''
+        returns.loc[present_date] = [holding_value_present]
+        returns.index.name = "date"
+        returns = returns.reset_index()
+        returns.to_csv("returns.csv",index=False)
     def scraper_get_currency_conv_factors(self,tickers, conversion_factors, reference_currency):
         currencies = tickers.currency.unique()
-        '''We are no interested in getting the conversion factor for the reference currency as we know it is 1 '''
+        '''We cannot get the conversion factor for the reference currency, so we leave it out of the web scraping as getting
+        the conversion factor for the currency itself leads to errors'''
         currencies = currencies[currencies != reference_currency]
         for currency in currencies:
             conversion_factor_text = r.get(f"https://wise.com/us/currency-converter/{currency}-to-{reference_currency}-rate?amount=1").text
             factor = float(re.search(ex_rate_regex,conversion_factor_text).group(2).replace(",",""))
             conversion_factors[currency]=factor
+        '''We include the conversion factor of the reference currency ( i.e 1), since it allow us to skimp on a lot of logic
+        when converting the currencies to the reference currency'''
+        self.conversion_factors[reference_currency] = 1
     def scraper_all_item_info(self,ticker):
         stock_info = {}
         summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'})
@@ -125,7 +158,6 @@ class StockScraper:
         df.at[row["Unnamed: 0"],'target_price']= updated_info["target_price"] 
     def check_items(self):
         userhome = os.path.expanduser('~')          
-        user = os.path.split(userhome)[-1]
         os.chdir("{home}/stockscraper_config".format(home=userhome))
         tickers = pd.read_csv("items.csv")
         for item in tickers.to_dict(orient="records"):
