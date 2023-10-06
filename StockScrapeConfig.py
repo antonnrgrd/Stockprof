@@ -28,7 +28,7 @@ class StockScrapeConfig:
         tickers = pd.DataFrame(columns = ['ticker','currency', 'current_price', 'initial_price', 'holding', 'alert_threshold'])
         tickers.to_csv('items.csv')
         holding_value = pd.DataFrame(columns = ['holding_value'])
-        holding_value.to_csv('holding_values.csv',index=False)
+        holding_value.to_csv('returns.csv',index=False)
     
     def config_extract_provided_values(self, args_as_dict):
         
@@ -55,6 +55,7 @@ class StockScrapeConfig:
         so we do not set it to false here'''
         print(tickers)
         tickers.to_csv("items.csv")
+
                 
 
                                      
@@ -87,6 +88,7 @@ def main():
     group.add_argument('--update_items', action="store_true")
     group.add_argument('--additem', action="store_true")
     group.add_argument('--config', action="store_true")
+    group.add_argument('--compute_returns',action="store_true")
     args = parser.parse_args()
     if args.config:
         userhome = os.path.expanduser('~')          
@@ -109,6 +111,8 @@ def main():
             print('Errror, provide at least the ticker of the stock')
     elif args.update_items:
         scraper.check_items()
+    elif args.compute_returns:
+        scraper.scraper_get_daily_returns()
     
          
             
