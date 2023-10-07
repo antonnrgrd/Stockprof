@@ -25,7 +25,7 @@ present_price_regex = "(FIN_TICKER_PRICE&quot;:&quot;)([0-9\.,]+)(&quot;)"
 dividend_yield_regex = "(\"DIVIDEND_AND_YIELD-value\">)(.+) \(([0-9]+\.[0-9]+%|N\/A)"
 one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9,]+\.[0-9]+|N\/A)"
 sector_regex = "(Sector\(s\)<\/span>:\s<span class=\"Fw\(600\)\">)(([a-zA-Z]|\s)+)(<\/span>)"
-industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;&,]+)(<\/span>)"
+industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;&,\-]+)"
 #country_regex = "(<\/h3><div\sclass=\"Mb\(25px\)\"><p\sclass=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">(<br\/>)(.+)<br\/>)([a-zA-Z]+)(<br\/>)"
 '''Behold, the ugliest regex known to man! the reason why this is so unsightly is that if we want to extract the location of the company
 we in the html code need to look for the adress, ending with the country in question. But there are so many ways you can specify an adress, with umlaut,
