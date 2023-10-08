@@ -168,18 +168,7 @@ class StockProfiler:
                             \\end{center}
                             \\end{table}
                            """)
-    def profiler_derive_information(self, tickers,reference_currency):
-        self.reference_currency = reference_currency
-        currencies = tickers.currency.unique()
-        '''We are no interested in getting the conversion factor for the reference currency as we know it is 1 '''
-        currencies = currencies[currencies != reference_currency]
-        for currency in currencies:
-            conversion_factor_text = r.get(f"https://wise.com/us/currency-converter/{currency}-to-{reference_currency}-rate?amount=1").text
-            factor = float(re.search(ex_rate_regex,conversion_factor_text).group(2).replace(",",""))
-            self.scraper.conversion_factors[currency]=factor
-        '''We have the conversion factor of the reference currency, since it allow us to skimp on a lot of logic
-        when converting the currencies to the reference currency'''
-        self.scraper.conversion_factors[reference_currency] = 1
+
     def profiler_get_as_ref_currency(self, stock_info):
         if stock_info["currency"] in self.scraper.conversion_factors:
             return stock_info["currency_amount"] * self.scraper.conversion_factors[stock_info["currency"]]
