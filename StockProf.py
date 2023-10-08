@@ -61,16 +61,7 @@ class StockProfiler:
 
             
     
-    def profiler_write_section(self, latex_report, title):
-        latex_report.write("""
-                           \\subsection*{{{}}}
-                           """.format(title)
-            )
-    def profiler_write_subsection(self, latex_report, title):
-        latex_report.write("""
-                           \\section*{{{}}}
-                           """.format(title)
-            )
+   
     def profiler_write_tikz_begin(self, latex_report, optional_info=None):
         if optional_info != None:
             latex_report.write("""
@@ -289,7 +280,7 @@ class StockProfiler:
                 else:
                     self.profiler_write_pchart(report, biggest_country_holdings,"country",2, 4, 0)
                 self.profiler_write_tikz_end(report)
-                self.profiler_write_subsection(report, "Distribution of sectors and industries")
+                self.profiler_write_section_type(report, "Distribution of sectors and industries", "subsection")
                 
                 self.profiler_write_tikz_begin(report,"""[auto=left] 
 \\node[circle] at (-3,-3) {Distribution of sector in holdings};
