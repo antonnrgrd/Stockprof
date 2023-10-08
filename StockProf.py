@@ -10,12 +10,9 @@ ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
 
 class StockProfiler:
-    def __init__(reference_currency):
+    def __init__(self):
         self.scraper = StockScraper()
         counter = 1
-        self.reference_currency = reference_currency
-        self.conversion_factors = {}
-        self.regions = None
         present_date = datetime.datetime.now()
         present_date = present_date.strftime("%d-%m-%Y")
         self.title = f"Portfolio_report_dated_{present_date}"
@@ -33,18 +30,34 @@ class StockProfiler:
         previous_monthly_returns = returns.iloc[0:30]
     def profiler_write_returns_yearly(self):
         pass
-    def profiler_write_returns_five_yearly(self)
-        
+    def profiler_write_returns_five_yearly(self):
+        pass
     def profiler_sanitize_ticker_data(self, tickers):
         '''These values are present in various values in the dataframe. They give issues with rendering the reports
         so we will rehave to replace them with something it can render'''
         tickers["industry"] = tickers['industry'].str.replace('&', '\&')
         tickers["industry"] = tickers['industry'].str.replace('—', '-')
 
-    def profiler_write_section_handler(latex_report, title, section_type):     
-        latex_report.write("""
-                    \\{}*{{{}}}
-                    """.format(section_type, title)
+    def profiler_write_section_type(self,latex_report, title, section_type, footnote=""):
+        if section_type == "section":
+            latex_report.write("""
+                           \\section*{{{title}}}
+                           """.format(title=title) + footnote
+            )
+        elif section_type == "subsection":
+            latex_report.write("""
+                           \\subsection*{{{title}}}
+                           """.format(title=title) + footnote
+            )
+        elif section_type == "subsubsection":
+           latex_report.write("""
+                           \\subsubsection*{{{title}}}
+                           """.format(title=title) + footnote
+            )
+        else:
+            raise Exception("Undefined section type")
+        
+
 
             
     
@@ -120,12 +133,12 @@ class StockProfiler:
     def profiler_write_end(self, latex_report):
         latex_report.write("""\\end{document} """)
     def profiler_write_currency_conversion_info(self,latex_report):
-        reference_currency = self.reference_currency
+        reference_currency = self.scraper.reference_currency
         '''We are not interested in writing the conversion factor out for the reference currency, since it is trivially 1 '''
-        self.conversion_factors.pop(self.reference_currency, None)
+        self.scraper.conversion_factors.pop(self.scraper.reference_currency, None)
         latex_report.write("""
                            \\subsection*{Conversion factors} """)
-        if len(self.conversion_factors) <=5:
+        if len(self.scraper.conversion_factors) <=5:
             latex_report.write("""\\begin{{table}}[!h]
                                 \\begin{{center}}
                                 \\begin{{tabular}}{{||c ||}} 
@@ -133,7 +146,7 @@ class StockProfiler:
                                  Reference currency : {}  \\\ [0.5ex] 
                                  \hline\hline
                               """.format(reference_currency))
-            for currency, factor in self.conversion_factors.items():
+            for currency, factor in self.scraper.conversion_factors.items():
                 latex_report.write("""{} : {}  \\\ 
                                    \hline """.format(currency, factor))
         else:
@@ -147,8 +160,8 @@ class StockProfiler:
                  \\hline
                  \\hline
                 """
-                .format(self.reference_currency))
-            iterable_factors = iter(self.conversion_factors.items())
+                .format(self.scraper.reference_currency))
+            iterable_factors = iter(self.scraper.conversion_factors.items())
             for currency_factor in iterable_factors:
                 first_factor, second_factor = currency_factor, next(iterable_factors, None)
                 if second_factor != None:
@@ -172,13 +185,13 @@ class StockProfiler:
         for currency in currencies:
             conversion_factor_text = r.get(f"https://wise.com/us/currency-converter/{currency}-to-{reference_currency}-rate?amount=1").text
             factor = float(re.search(ex_rate_regex,conversion_factor_text).group(2).replace(",",""))
-            self.conversion_factors[currency]=factor
+            self.scraper.conversion_factors[currency]=factor
         '''We have the conversion factor of the reference currency, since it allow us to skimp on a lot of logic
         when converting the currencies to the reference currency'''
-        self.conversion_factors[reference_currency] = 1
+        self.scraper.conversion_factors[reference_currency] = 1
     def profiler_get_as_ref_currency(self, stock_info):
-        if stock_info["currency"] in self.conversion_factors:
-            return stock_info["currency_amount"] * self.conversion_factors[stock_info["currency"]]
+        if stock_info["currency"] in self.scraper.conversion_factors:
+            return stock_info["currency_amount"] * self.scraper.conversion_factors[stock_info["currency"]]
         else:
             return stock_info["currency_amount"]
     def profiler_write_report(self):
@@ -215,22 +228,19 @@ class StockProfiler:
         userhome = os.path.expanduser('~')          
         if os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
             tickers =  pd.read_csv(f"{userhome}\\stockscraper_config\\items.csv")
-            with open(f"{userhome}\\stockscraper_config\\config_info.json") as f:
-                config_info = json.load(f)
-                self.scraper.scraper_get_currency_conv_factors(tickers, config_info["ref_currency"])
+            self.scraper.scraper_get_currency_conv_factors(tickers)
             self.profiler_sanitize_ticker_data(tickers)
             tickers['currency_amount'] = tickers.holding * tickers.current_price
-            
             currency_holdings = tickers.groupby(['currency'])['currency_amount'].sum().reset_index()
             '''We convert the target currency to the reference currency e.g DKK. If it is not present in the conversion factors, we assume
             that it is because it is the reference currency and so return it as so.'''
-            currency_holdings["own_currency"] = currency_holdings.apply(lambda currencies: currencies["currency_amount"] * self.conversion_factors[currencies["currency"]] if currencies["currency"] in self.conversion_factors else currencies["currency_amount"], axis=1)
+            currency_holdings["own_currency"] = currency_holdings.apply(lambda currencies: currencies["currency_amount"] * self.scraper.conversion_factors[currencies["currency"]] if currencies["currency"] in self.scraper.conversion_factors else currencies["currency_amount"], axis=1)
             total_holding_own_currency = currency_holdings["own_currency"].sum()
             currency_holdings["weighting"] = currency_holdings["own_currency"] / total_holding_own_currency
 
     
             sector_holdings = tickers.groupby(['sector','currency'])['currency_amount'].sum().reset_index()
-            sector_holdings["currency_amount"] = sector_holdings["currency"].map(self.conversion_factors).mul(sector_holdings["currency_amount"]) 
+            sector_holdings["currency_amount"] = sector_holdings["currency"].map(self.scraper.conversion_factors).mul(sector_holdings["currency_amount"]) 
             sector_holdings = sector_holdings.rename(columns={'currency_amount': 'own_currency'})
             sector_weighting = sector_holdings.groupby(['sector'])['own_currency'].sum().reset_index()
             sector_weighting["weighting"] = sector_weighting["own_currency"] / total_holding_own_currency
@@ -240,13 +250,13 @@ class StockProfiler:
 
             
             industry_holdings = tickers.groupby(['industry','currency'])['currency_amount'].sum().reset_index()
-            industry_holdings["currency_amount"] = industry_holdings["currency"].map(self.conversion_factors).mul(industry_holdings["currency_amount"]) 
+            industry_holdings["currency_amount"] = industry_holdings["currency"].map(self.scraper.conversion_factors).mul(industry_holdings["currency_amount"]) 
             industry_holdings = industry_holdings.rename(columns={'currency_amount': 'own_currency'})
             industry_weighting = industry_holdings.groupby(['industry'])['own_currency'].sum().reset_index()
             industry_weighting["weighting"] = industry_weighting["own_currency"] / total_holding_own_currency
 
             country_holdings = tickers.groupby(['country','currency'])['currency_amount'].sum().reset_index()
-            country_holdings["currency_amount"] = country_holdings["currency"].map(self.conversion_factors).mul(country_holdings["currency_amount"]) 
+            country_holdings["currency_amount"] = country_holdings["currency"].map(self.scraper.conversion_factors).mul(country_holdings["currency_amount"]) 
             country_holdings = country_holdings.rename(columns={'currency_amount': 'own_currency'})
             country_weighting = country_holdings.groupby(['country'])['own_currency'].sum().reset_index()
             country_weighting["weighting"] = country_weighting["own_currency"] / total_holding_own_currency
@@ -261,8 +271,8 @@ class StockProfiler:
             userhome = os.path.expanduser('~') 
             with open("{}\\stockscraper_config\\{}.tex".format(userhome, self.title), 'w') as report:
                 self.profiler_write_preamble(report)
-                self.profiler_write_section(report, "Distribution of holdings")
-                self.profiler_write_subsection(report, "Distribution of currencies and countries")
+                self.profiler_write_section_type(report, "Distribution of holdings", "section")
+                self.profiler_write_section_type(report, "Distribution of currencies and countries", "subsection")
                 self.profiler_write_tikz_begin(report,"""[auto=left] 
 \\node[circle] at (-3,-3) {Distribution of currencies in holdings};
 \\node[circle] at (4,-3) {Distribution of nationality in holdings};""")
@@ -297,10 +307,10 @@ class StockProfiler:
                 else:
                     self.profiler_write_pchart(report, biggest_industry_holdings,"country",2, 4, 0)
                 self.profiler_write_tikz_end(report)
-                self.profiler_write_subsection(report, "Top stock by weighting")   
+                self.profiler_write_section_type(report, "Top stocks by weighting", "subsection")   
                 
-                self.profiler_write_section(report, "Information used to produce report")
-                self.profiler_write_subsection(report, "Currency conversion rates")                
+                self.profiler_write_section_type(report, "Information used to produce report", "section")
+                self.profiler_write_section_type(report, "Currency conversion rates", "subsection")                
                 self.profiler_write_currency_conversion_info(report)
                 self.profiler_write_ending(report)
                  

@@ -40,9 +40,18 @@ ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 class StockScraper:
     def __init__(self):
         self.conversion_factors = {}
+        self.reference_currency = None
+        self.scraper_readin_config()
+    def scraper_readin_config(self):
+        userhome = os.path.expanduser('~')
+        with open(f"{userhome}\\stockscraper_config\\config_info.json") as f:
+            config_info = json.load(f)
+            self.reference_currency = config_info["ref_currency"]
+        
+        
     def scraper_generate_dummy_returns(self):
         userhome = os.path.expanduser('~')
-        returns = pd.read_csv(f"{userhome}/stockscraper_config/holding_values.csv")          
+        returns = pd.read_csv(f"{userhome}/stockscraper_config/returns.csv")          
         base = datetime.datetime.today()
         date_list = date_list = [(base - datetime.timedelta(days=x)).strftime("%d-%m-%Y") for x in range(365 * 5)]
         return_values = [1000000]
@@ -81,18 +90,18 @@ class StockScraper:
         returns.index.name = "date"
         returns = returns.reset_index()
         returns.to_csv("returns.csv",index=False)
-    def scraper_get_currency_conv_factors(self,tickers, conversion_factors, reference_currency):
+    def scraper_get_currency_conv_factors(self,tickers):
         currencies = tickers.currency.unique()
         '''We cannot get the conversion factor for the reference currency, so we leave it out of the web scraping as getting
         the conversion factor for the currency itself leads to errors'''
-        currencies = currencies[currencies != reference_currency]
+        currencies = currencies[currencies != self.reference_currency]
         for currency in currencies:
-            conversion_factor_text = r.get(f"https://wise.com/us/currency-converter/{currency}-to-{reference_currency}-rate?amount=1").text
+            conversion_factor_text = r.get("https://wise.com/us/currency-converter/{currency}-to-{reference_currency}-rate?amount=1".format(currency=currency, reference_currency=self.reference_currency)).text
             factor = float(re.search(ex_rate_regex,conversion_factor_text).group(2).replace(",",""))
-            conversion_factors[currency]=factor
+            self.conversion_factors[currency]=factor
         '''We include the conversion factor of the reference currency ( i.e 1), since it allow us to skimp on a lot of logic
         when converting the currencies to the reference currency'''
-        self.conversion_factors[reference_currency] = 1
+        self.conversion_factors[self.reference_currency] = 1
     def scraper_all_item_info(self,ticker):
         stock_info = {}
         summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'})
