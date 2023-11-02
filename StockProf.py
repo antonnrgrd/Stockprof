@@ -17,17 +17,149 @@ class StockProfiler:
         present_date = present_date.strftime("%d-%m-%Y")
         self.title = f"Portfolio_report_dated_{present_date}"
         self.present_date = present_date
-        userhome = os.path.expanduser('~') 
-        if os.path.exists("{}\\stockscraper_config\\{}.tex".format(userhome, self.title)):
+        self.userhome = os.path.expanduser('~') 
+        if os.path.exists("{}\\stockscraper_config\\{}.tex".format( self.userhome, self.title)):
             self.title = f"Portfolio_report_dated_{present_date}({counter})"
-            while os.path.exists("{}\\stockscraper_config\\{}.tex".format(userhome, self.title)):
+            while os.path.exists("{}\\stockscraper_config\\{}.tex".format(self.userhome, self.title)):
                 counter = counter + 1
                 self.title = f"Portfolio_report_dated_{present_date}({counter})"
-    def profiler_write_returns(self, latex_report, returns, time_frame):
-        latex_report.write
-    
-    def profiler_write_returns_monthly(self, returns):
-        previous_monthly_returns = returns.iloc[0:30]
+        self.month_num_to_month_name_mapping = {"01": "Jan.", "02": "Feb.", "03": "March", "04": "April", "05": "May", "06": "June", "07": "July","08":"Aug.","09":"Sept.", "10":"Oct.", "11":"Nov.", "12": "Dec."}
+        self.num_to_month_name_mapping = {1: "Jan.", 2: "Feb.", 3: "March", 4: "April", 5: "May", 6: "June", 7: "July",8:"Aug.",9:"Sept.", 10:"Oct.", 11:"Nov.", 0: "Dec."}
+   
+          
+    def profiler_write_axis_information(self, latex_report, returns, time_frame):
+        '''We will frequently be using the year to look up certain dates, in order to get their associated tick position,
+        in order to find out what tick values we should use when labeling the ticks. The date format is dd-mm-yyyy, so
+        we get the year by taking what comes after the second occurence of the - character'''
+        end_date = returns.iloc[0].name
+        '''Because the date values are fixed-length, the slice 3:5 is guaranteed to yield the month '''
+        month = int(end_date[3:5])
+        '''Extracts everything that comes after the last hyphen (year) '''
+        year =  re.split("-", end_date, 2)[-1]
+        '''When having to look backwards in time, we have to account for e.g wrapping around to the last month in the previous
+        year. Doing this index wise, with the index of the first month of the end date as a referenceis much easier. 
+        We convert it to an int because for some reason it returns the index as a float. We take the absolute value of the subtraction
+        of the length of the return frame to convert it to regular list-style index'''
+        reference_index = int( abs((returns.loc[f"01-{month}-{year}"]["index_as_offset"])- len(returns)))
+        ticks_as_str = "{"
+        ticker_values = []
+        ticker_labels = []
+        tick_labels_as_str = "{"
+        if time_frame == "monthly":
+            date_index = (returns.at[end_date,"index_as_offset"] -1) -7
+            date=returns.iloc[date_index].name
+            while len(ticker_values) < 3:
+                ticker_values.insert(0,returns.at[date,"index_as_offset"])
+                ticker_labels.insert(0,date)
+                day_index = date_index-7
+                date=returns.iloc[date_index].name
+        elif time_frame == "six_monthly":
+            day = int(end_date[0:2])
+            date_index = (returns.at[end_date,"index_as_offset"] -1) -7
+            date=returns.iloc[date_index].name
+            ticks_as_str = ticks_as_str + "{offset_1},{offset_2},{offset_3},{offset_4},{offset_5},{offset_6},{offset_7},{offset_8},{offset_9},{offset_10},{offset_11}".format(offset_1 = int(returns.iloc[reference_index * ((30) * 5) ]["index_as_offset"]))
+            tick_labels_as_str = tick_labels_as_str + "{month_1},14,{month_2},14,{month_3},14,{month_4},14,{month_5},14,{month_6}".format(month_1=self.num_to_month_name_mapping[abs(month-5)],month_2=self.num_to_month_name_mapping[abs(month-4)],month_3=self.num_to_month_name_mapping[abs(month-3)],month_4=self.num_to_month_name_mapping[abs(month-2)],month_5=self.num_to_month_name_mapping[abs(month-1)],month_6=self.month_num_to_month_name_mapping[month]) 
+            if day > 13:
+              ticks_as_str = ticks_as_str + returns.at[f"14-{month}-{year}","index_as_offset"]
+              tick_labels_as_str = tick_labels_as_str + "14"
+        elif time_frame == "yearly":
+            current_month = month -1
+            while current_month > 0:
+                ticker_values.insert(0,returns.at["01-{current_month}-{year}".format(current_month=current_month, year=year),"index_as_offset"])
+                ticker_labels.insert(0, self.month_num_to_month_name_mapping["{current_month}".format(current_month=current_month)[3:5]])
+                current_month = current_month -1
+            current_month = 12
+            while len(ticker_values) < 12:
+                ticker_values.insert(0,returns.at["01-{current_month}-{year}".format(current_month=current_month, year=year-1),"index_as_offset"])
+                ticker_labels.insert(0, self.month_num_to_month_name_mapping["{current_month}".format(current_month=current_month)[3:5]])
+                current_month = current_month -1
+            ticks_as_str = ticks_as_str + "{offset_1},{offset_2},{offset_3},{offset_4},{offset_5},{offset_6},{offset_7},{offset_8},{offset_9},{offset_10},{offset_11},{offset_12}".format(offset_1=ticker_values[0],offset_2=ticker_values[1],offset_3=ticker_values[2],offset_4=ticker_values[3],offset_5=ticker_values[4],offset_6=ticker_values[5],offset_7=ticker_values[6],offset_8=ticker_values[7],offset_9=ticker_values[8],offset_10=ticker_values[9],offset_11=ticker_values[10],offset_12=ticker_values[11])
+            tick_labels_as_str = tick_labels_as_str + "{month_1},{month_2},{month_3},{month_4},{month_5},{month_6},{month_7},{month_8},{month_9},{month_10},{month_11},{month_12}".format()
+        elif time_frame == "five_yearly":
+            ticks_as_str = ticks_as_str + "{offset_1},{offset_2},{offset_3},{offset_4},{offset_5},{offset_6},{offset_7},{offset_8},{offset_9}".format(offset_1=returns.at["01-01-{year}".format(year = int(year) -4),"index_as_offset"],offset_2=returns.at["01-07-{year}".format(year = int(year) -4),"index_as_offset"],offset_3=returns.at["01-01-{year}".format(year = int(year) -3),"index_as_offset"],offset_4=returns.at["01-07-{year}".format(year = int(year) -3),"index_as_offset"],offset_5=returns.at["01-01-{year}".format(year = int(year) -2),"index_as_offset"],offset_6=returns.at["01-07-{year}".format(year = int(year) -2),"index_as_offset"],offset_7=returns.at["01-01-{year}".format(year = int(year) -1),"index_as_offset"],index_8=returns.at["01-07-{year}".format(year = int(year) -1),"index_as_offset"],offset_9=returns.at[f"01-01-{year}","index_as_offset"])
+            tick_labels_as_str = tick_labels_as_str + "{first_year},Jul, {second_year},Jul, {third_year}, Jul, {fourth_year}, Jul,{fith_year}".format(first_year=int(year)-4,second_year=int(year) -3,third_year=int(year)-2,fourth_year=int(year) -1,fith_year=year)
+            
+
+            if month > 5:
+                ticks_as_str = ticks_as_str + ",{extra_ticker}".format(extracker_ticker=returns.at[f"01-06-{year}","index_as_offset"])
+                tick_labels_as_str = + ", Jul"
+        tickers_as_str = "{"
+        for ticker_offset in tickers:
+            tickers_as_str = tickers_as_str + f"{ticker_offset},"
+        tickers_as_str = tickers_as_str  + "}"
+        tick_labels_as_str = tick_labels_as_str + "}"
+        latex_report.write(f"""
+                           xtick={tickers_as_str},
+                           xticklabels={tick_labels_as_str},
+                           """)
+        
+            
+                                        
+    def profiler_write_axis_begin(self,latex_report):
+        latex_report.write("""
+                           \begin{axis}[
+                          """)
+    def profiler_write_axis_mid(self,latex_report):
+        latex_report.write("""
+                           ]
+                          """)                      
+    def profiler_write_axis_end(self,latex_report):
+        latex_report.write("""
+                           \end{axis}
+                          """)
+    def profiler_write_monthly_returns_axis(self,latex_report, returns):
+        latex_report.write("""
+                           title={Returns on investment over a one month period},                 
+                           grid = both,
+            """)
+        self.profiler_write_axis_information(latex_report, returns, "monthly")
+    def profiler_write_yearly_returns_axis(self,latex_report, returns):
+       latex_report.write("""
+                          title={Returns on investment over a yearly period},                 
+                          grid = both,
+           """)
+       self.profiler_write_axis_information(latex_report, returns, "yearly")
+    def profiler_write_five_yearly_returns_axis(self,latex_report, returns):
+      latex_report.write("""
+                         title={Returns on investment over a yearly period},                 
+                         grid = both,
+          """)
+    def profiler_write_returns_period(self, latex_report, returns, timeframe):
+        returns_range = None
+        if timeframe == "monthly":
+            returns_range = returns.iloc[0:30]
+        elif timeframe == "six_monthly":
+            returns_range = returns.iloc[0:30]
+        elif timeframe == "yearly":
+            returns_range = returns.iloc[0:365:]
+        elif timeframe == "five_yearly":
+            returns_range = returns.iloc[0:1825:]
+        '''In order to identify the tick values for the axis information, we need to be able to quickly get the associated
+        integer "index" of the index. I have tried seeing if there is neat method for doing this, but approach was found. The solution
+        was to literally store the values as a column. As a side note, loc returns a REFERENCE i.e shallow copy subset of the
+        dataframe and you cannot modify it. We therefore need to have the result of iloc as a seperate copy'''
+        returns_range = returns_range.copy()
+        returns_range["index_as_offset"] = [x for x in range(len(returns_range),0,-1)]       
+        self.profiler_write_tikz_begin(latex_report)
+        if timeframe == "monthly":
+            self.profiler_write_monthly_returns_axis(latex_report, returns_range)
+        elif timeframe == "six_monthly":
+            pass
+        elif timeframe == "yearly":
+            self.profiler_write_yearly_returns_axis(latex_report, returns_range)
+        elif timeframe == "five_yearly":
+            pass
+        latex_report.write("""
+                           \addplot [color=red] coordinates
+                          """)
+        for i in range(len(returns_range)):
+            latex_report.write("""
+                           ({index},{value}) 
+                          """.format(index = i,value=returns_range.iloc[i]["holding_value"]))
+        latex_report.write("""
+                           };
+                          """)
+        self.profiler_write_tikz_end(latex_report)
     def profiler_write_returns_yearly(self):
         pass
     def profiler_write_returns_five_yearly(self):
@@ -169,11 +301,7 @@ class StockProfiler:
                             \\end{table}
                            """)
 
-    def profiler_get_as_ref_currency(self, stock_info):
-        if stock_info["currency"] in self.scraper.conversion_factors:
-            return stock_info["currency_amount"] * self.scraper.conversion_factors[stock_info["currency"]]
-        else:
-            return stock_info["currency_amount"]
+
     def profiler_write_report(self):
         pass
         
@@ -204,43 +332,91 @@ class StockProfiler:
          latex_report.write("""\end{document}""")
     def profiler_write_enumerate(self, latex_report, ):
         pass
+    
+    def profiler_write_weighting_information(self, latex_report, tickers):
+        tickers['currency_amount'] = tickers.holding * tickers.current_price
+        currency_holdings = tickers.groupby(['currency'])['currency_amount'].sum().reset_index()
+        '''We convert the target currency to the reference currency e.g DKK. If it is not present in the conversion factors, we assume
+        that it is because it is the reference currency and so return it as so.'''
+        currency_holdings["own_currency"] = currency_holdings.apply(lambda currencies: currencies["currency_amount"] * self.scraper.conversion_factors[currencies["currency"]] if currencies["currency"] in self.scraper.conversion_factors else currencies["currency_amount"], axis=1)
+        total_holding_own_currency = currency_holdings["own_currency"].sum()
+        currency_holdings["weighting"] = currency_holdings["own_currency"] / total_holding_own_currency
+
+
+        sector_holdings = tickers.groupby(['sector','currency'])['currency_amount'].sum().reset_index()
+        sector_holdings["currency_amount"] = sector_holdings["currency"].map(self.scraper.conversion_factors).mul(sector_holdings["currency_amount"]) 
+        sector_holdings = sector_holdings.rename(columns={'currency_amount': 'own_currency'})
+        sector_weighting = sector_holdings.groupby(['sector'])['own_currency'].sum().reset_index()
+        sector_weighting["weighting"] = sector_weighting["own_currency"] / total_holding_own_currency
+
+        
+
+
+        
+        industry_holdings = tickers.groupby(['industry','currency'])['currency_amount'].sum().reset_index()
+        industry_holdings["currency_amount"] = industry_holdings["currency"].map(self.scraper.conversion_factors).mul(industry_holdings["currency_amount"]) 
+        industry_holdings = industry_holdings.rename(columns={'currency_amount': 'own_currency'})
+        industry_weighting = industry_holdings.groupby(['industry'])['own_currency'].sum().reset_index()
+        industry_weighting["weighting"] = industry_weighting["own_currency"] / total_holding_own_currency
+
+        country_holdings = tickers.groupby(['country','currency'])['currency_amount'].sum().reset_index()
+        country_holdings["currency_amount"] = country_holdings["currency"].map(self.scraper.conversion_factors).mul(country_holdings["currency_amount"]) 
+        country_holdings = country_holdings.rename(columns={'currency_amount': 'own_currency'})
+        country_weighting = country_holdings.groupby(['country'])['own_currency'].sum().reset_index()
+        country_weighting["weighting"] = country_weighting["own_currency"] / total_holding_own_currency
+        
+        self.profiler_write_section_type(latex_report, "Distribution of holdings", "section")
+        self.profiler_write_section_type(latex_report, "Distribution of currencies and countries", "subsection")
+        self.profiler_write_tikz_begin(latex_report,"""[auto=left] 
+        \\node[circle] at (-3,-3) {Distribution of currencies in holdings};
+        \\node[circle] at (4,-3) {Distribution of nationality in holdings};""")
+        if len(currency_holdings) > 5:
+            biggest_currency_holdings = currency_holdings.nlargest(5, columns=['weighting']).reset_index()
+            remaining_weight = 1 - biggest_currency_holdings['weighting'].sum()
+            self.profiler_write_pchart(latex_report, biggest_currency_holdings,"currency",2, -3, 0, remaining_weight)
+        else:
+            self.profiler_write_pchart(latex_report, currency_holdings,"currency",2, -3, 0)
+        if len(country_holdings) > 5:
+             biggest_country_holdings = country_weighting.nlargest(5, columns=['weighting']).reset_index()
+             remaining_weight = 1 - biggest_country_holdings['weighting'].sum()
+             self.profiler_write_pchart(latex_report, biggest_country_holdings,"country",2, 4, 0, remaining_weight)
+        else:
+            self.profiler_write_pchart(latex_report, biggest_country_holdings,"country",2, 4, 0)
+        self.profiler_write_tikz_end(latex_report)
+        self.profiler_write_section_type(latex_report, "Distribution of sectors and industries", "subsection")
+        
+        self.profiler_write_tikz_begin(latex_report,"""[auto=left] 
+\\node[circle] at (-3,-3) {Distribution of sector in holdings};
+\\node[circle] at (4,-3) {Distribution of industry in holdings};""")
+        if len(sector_holdings) > 5:
+            biggest_sector_holdings = sector_weighting.nlargest(5, columns=['weighting']).reset_index()
+            remaining_weight = 1 - biggest_sector_holdings['weighting'].sum()
+            self.profiler_write_pchart(latex_report, biggest_sector_holdings,"sector",2, -3, 0, remaining_weight)
+        else:
+            self.profiler_write_pchart(latex_report, currency_holdings,"currency",2, -3, 0)
+        if len(industry_holdings) > 5:
+             biggest_industry_holdings = industry_weighting.nlargest(5, columns=['weighting']).reset_index()
+             remaining_weight = 1 - biggest_country_holdings['weighting'].sum()
+             self.profiler_write_pchart(latex_report, biggest_industry_holdings,"industry",2, 4, 0, remaining_weight)
+        else:
+            self.profiler_write_pchart(latex_report, biggest_industry_holdings,"country",2, 4, 0)
+        self.profiler_write_tikz_end(latex_report)
+        self.profiler_write_section_type(latex_report, "Top stocks by weighting", "subsection")   
+   
+
+    def profiler_write_performance_information(self, latex_report):
+        returns = returns = pd.read_csv("{userhome}/stockscraper_config/returns.csv".format(userhome=self.userhome),index_col=0)
+        self.profiler_write_section_type(latex_report, "Portfolio performance", "section")
+        self.profiler_write_section_type(latex_report, "Returns", "subsection")
+        self.profiler_write_section_type(latex_report, "Monthly returns", "subsubsection")
+        self.profiler_write_returns_period(latex_report, returns, "monthly")
+         
     def profiler_generate_report_info(self):
         userhome = os.path.expanduser('~')          
         if os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
             tickers =  pd.read_csv(f"{userhome}\\stockscraper_config\\items.csv")
             self.scraper.scraper_get_currency_conv_factors(tickers)
             self.profiler_sanitize_ticker_data(tickers)
-            tickers['currency_amount'] = tickers.holding * tickers.current_price
-            currency_holdings = tickers.groupby(['currency'])['currency_amount'].sum().reset_index()
-            '''We convert the target currency to the reference currency e.g DKK. If it is not present in the conversion factors, we assume
-            that it is because it is the reference currency and so return it as so.'''
-            currency_holdings["own_currency"] = currency_holdings.apply(lambda currencies: currencies["currency_amount"] * self.scraper.conversion_factors[currencies["currency"]] if currencies["currency"] in self.scraper.conversion_factors else currencies["currency_amount"], axis=1)
-            total_holding_own_currency = currency_holdings["own_currency"].sum()
-            currency_holdings["weighting"] = currency_holdings["own_currency"] / total_holding_own_currency
-
-    
-            sector_holdings = tickers.groupby(['sector','currency'])['currency_amount'].sum().reset_index()
-            sector_holdings["currency_amount"] = sector_holdings["currency"].map(self.scraper.conversion_factors).mul(sector_holdings["currency_amount"]) 
-            sector_holdings = sector_holdings.rename(columns={'currency_amount': 'own_currency'})
-            sector_weighting = sector_holdings.groupby(['sector'])['own_currency'].sum().reset_index()
-            sector_weighting["weighting"] = sector_weighting["own_currency"] / total_holding_own_currency
-
-            
-
-
-            
-            industry_holdings = tickers.groupby(['industry','currency'])['currency_amount'].sum().reset_index()
-            industry_holdings["currency_amount"] = industry_holdings["currency"].map(self.scraper.conversion_factors).mul(industry_holdings["currency_amount"]) 
-            industry_holdings = industry_holdings.rename(columns={'currency_amount': 'own_currency'})
-            industry_weighting = industry_holdings.groupby(['industry'])['own_currency'].sum().reset_index()
-            industry_weighting["weighting"] = industry_weighting["own_currency"] / total_holding_own_currency
-
-            country_holdings = tickers.groupby(['country','currency'])['currency_amount'].sum().reset_index()
-            country_holdings["currency_amount"] = country_holdings["currency"].map(self.scraper.conversion_factors).mul(country_holdings["currency_amount"]) 
-            country_holdings = country_holdings.rename(columns={'currency_amount': 'own_currency'})
-            country_weighting = country_holdings.groupby(['country'])['own_currency'].sum().reset_index()
-            country_weighting["weighting"] = country_weighting["own_currency"] / total_holding_own_currency
-            
             tickers['returns'] = tickers.initial_price / tickers.current_price
             biggest_return_p =  tickers.loc[tickers['returns'].idxmax()]
             biggest_loss_return_p =  tickers.loc[tickers['returns'].idxmin()]
@@ -251,44 +427,9 @@ class StockProfiler:
             userhome = os.path.expanduser('~') 
             with open("{}\\stockscraper_config\\{}.tex".format(userhome, self.title), 'w') as report:
                 self.profiler_write_preamble(report)
-                self.profiler_write_section_type(report, "Distribution of holdings", "section")
-                self.profiler_write_section_type(report, "Distribution of currencies and countries", "subsection")
-                self.profiler_write_tikz_begin(report,"""[auto=left] 
-\\node[circle] at (-3,-3) {Distribution of currencies in holdings};
-\\node[circle] at (4,-3) {Distribution of nationality in holdings};""")
-                if len(currency_holdings) > 5:
-                    biggest_currency_holdings = currency_holdings.nlargest(5, columns=['weighting']).reset_index()
-                    remaining_weight = 1 - biggest_currency_holdings['weighting'].sum()
-                    self.profiler_write_pchart(report, biggest_currency_holdings,"currency",2, -3, 0, remaining_weight)
-                else:
-                    self.profiler_write_pchart(report, currency_holdings,"currency",2, -3, 0)
-                if len(country_holdings) > 5:
-                     biggest_country_holdings = country_weighting.nlargest(5, columns=['weighting']).reset_index()
-                     remaining_weight = 1 - biggest_country_holdings['weighting'].sum()
-                     self.profiler_write_pchart(report, biggest_country_holdings,"country",2, 4, 0, remaining_weight)
-                else:
-                    self.profiler_write_pchart(report, biggest_country_holdings,"country",2, 4, 0)
-                self.profiler_write_tikz_end(report)
-                self.profiler_write_section_type(report, "Distribution of sectors and industries", "subsection")
-                
-                self.profiler_write_tikz_begin(report,"""[auto=left] 
-\\node[circle] at (-3,-3) {Distribution of sector in holdings};
-\\node[circle] at (4,-3) {Distribution of industry in holdings};""")
-                if len(sector_holdings) > 5:
-                    biggest_sector_holdings = sector_weighting.nlargest(5, columns=['weighting']).reset_index()
-                    remaining_weight = 1 - biggest_sector_holdings['weighting'].sum()
-                    self.profiler_write_pchart(report, biggest_sector_holdings,"sector",2, -3, 0, remaining_weight)
-                else:
-                    self.profiler_write_pchart(report, currency_holdings,"currency",2, -3, 0)
-                if len(industry_holdings) > 5:
-                     biggest_industry_holdings = industry_weighting.nlargest(5, columns=['weighting']).reset_index()
-                     remaining_weight = 1 - biggest_country_holdings['weighting'].sum()
-                     self.profiler_write_pchart(report, biggest_industry_holdings,"industry",2, 4, 0, remaining_weight)
-                else:
-                    self.profiler_write_pchart(report, biggest_industry_holdings,"country",2, 4, 0)
-                self.profiler_write_tikz_end(report)
-                self.profiler_write_section_type(report, "Top stocks by weighting", "subsection")   
-                
+               
+                self.profiler_write_performance_information(report)
+                self.profiler_write_weighting_information(report, tickers)
                 self.profiler_write_section_type(report, "Information used to produce report", "section")
                 self.profiler_write_section_type(report, "Currency conversion rates", "subsection")                
                 self.profiler_write_currency_conversion_info(report)
