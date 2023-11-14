@@ -7,8 +7,10 @@ import json
 import math
 from StockScraper import *
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
-
-
+one_month_tickinfo_regex = "^07-|^14-|^21-|^28-|^01|^01-01"
+six_months_tickinfo_regex = "^14-|28-|^01|^01-01"
+yearly_tickinfo_regex = "^01-|^01-01"
+five_years_tickinfo_regex = "^01-01-|^01-06"
 class StockProfiler:
     def __init__(self):
         self.scraper = StockScraper()
@@ -24,89 +26,81 @@ class StockProfiler:
                 counter = counter + 1
                 self.title = f"Portfolio_report_dated_{present_date}({counter})"
         self.month_num_to_month_name_mapping = {"01": "Jan.", "02": "Feb.", "03": "March", "04": "April", "05": "May", "06": "June", "07": "July","08":"Aug.","09":"Sept.", "10":"Oct.", "11":"Nov.", "12": "Dec."}
-        self.num_to_month_name_mapping = {1: "Jan.", 2: "Feb.", 3: "March", 4: "April", 5: "May", 6: "June", 7: "July",8:"Aug.",9:"Sept.", 10:"Oct.", 11:"Nov.", 0: "Dec."}
+        self.range_to_title_mapping = {"monthly":"{Returns on investment over a one month period}", "six_monthly":"{Returns on investment over a six-month period}","yearly": "{Returns on investment over a year}","five_yearly":"{Returns on investment over five years}"}
    
           
     def profiler_write_axis_information(self, latex_report, returns, time_frame):
-        '''We will frequently be using the year to look up certain dates, in order to get their associated tick position,
-        in order to find out what tick values we should use when labeling the ticks. The date format is dd-mm-yyyy, so
-        we get the year by taking what comes after the second occurence of the - character'''
-        end_date = returns.iloc[0].name
-        '''Because the date values are fixed-length, the slice 3:5 is guaranteed to yield the month '''
-        month = int(end_date[3:5])
-        '''Extracts everything that comes after the last hyphen (year) '''
-        year =  re.split("-", end_date, 2)[-1]
-        '''When having to look backwards in time, we have to account for e.g wrapping around to the last month in the previous
-        year. Doing this index wise, with the index of the first month of the end date as a referenceis much easier. 
-        We convert it to an int because for some reason it returns the index as a float. We take the absolute value of the subtraction
-        of the length of the return frame to convert it to regular list-style index'''
-        reference_index = int( abs((returns.loc[f"01-{month}-{year}"]["index_as_offset"])- len(returns)))
         ticks_as_str = "{"
         ticker_values = []
         ticker_labels = []
         tick_labels_as_str = "{"
         if time_frame == "monthly":
-            date_index = (returns.at[end_date,"index_as_offset"] -1) -7
-            date=returns.iloc[date_index].name
-            while len(ticker_values) < 3:
-                ticker_values.insert(0,returns.at[date,"index_as_offset"])
-                ticker_labels.insert(0,date)
-                day_index = date_index-7
-                date=returns.iloc[date_index].name
+            returns_values = returns[returns.index.str.contains(one_month_tickinfo_regex,regex=True)]
+            ticker_values = returns_values['index_as_offset'].to_list()
+            ticker_dates = returns_values.index.to_list()
+            ticker_labels = [self.month_num_to_month_name_mapping[date[3:5]] if date[0:2] == "01" else date[3:] for date in ticker_dates]
         elif time_frame == "six_monthly":
-            day = int(end_date[0:2])
-            date_index = (returns.at[end_date,"index_as_offset"] -1) -7
-            date=returns.iloc[date_index].name
-            ticks_as_str = ticks_as_str + "{offset_1},{offset_2},{offset_3},{offset_4},{offset_5},{offset_6},{offset_7},{offset_8},{offset_9},{offset_10},{offset_11}".format(offset_1 = int(returns.iloc[reference_index * ((30) * 5) ]["index_as_offset"]))
-            tick_labels_as_str = tick_labels_as_str + "{month_1},14,{month_2},14,{month_3},14,{month_4},14,{month_5},14,{month_6}".format(month_1=self.num_to_month_name_mapping[abs(month-5)],month_2=self.num_to_month_name_mapping[abs(month-4)],month_3=self.num_to_month_name_mapping[abs(month-3)],month_4=self.num_to_month_name_mapping[abs(month-2)],month_5=self.num_to_month_name_mapping[abs(month-1)],month_6=self.month_num_to_month_name_mapping[month]) 
-            if day > 13:
-              ticks_as_str = ticks_as_str + returns.at[f"14-{month}-{year}","index_as_offset"]
-              tick_labels_as_str = tick_labels_as_str + "14"
+             returns_values = returns[returns.index.str.contains(six_months_tickinfo_regex,regex=True)]
+             ticker_values = returns_values['index_as_offset'].to_list()
+             ticker_dates = returns_values.index.to_list()
         elif time_frame == "yearly":
-            current_month = month -1
-            while current_month > 0:
-                ticker_values.insert(0,returns.at["01-{current_month}-{year}".format(current_month=current_month, year=year),"index_as_offset"])
-                ticker_labels.insert(0, self.month_num_to_month_name_mapping["{current_month}".format(current_month=current_month)[3:5]])
-                current_month = current_month -1
-            current_month = 12
-            while len(ticker_values) < 12:
-                ticker_values.insert(0,returns.at["01-{current_month}-{year}".format(current_month=current_month, year=year-1),"index_as_offset"])
-                ticker_labels.insert(0, self.month_num_to_month_name_mapping["{current_month}".format(current_month=current_month)[3:5]])
-                current_month = current_month -1
-            ticks_as_str = ticks_as_str + "{offset_1},{offset_2},{offset_3},{offset_4},{offset_5},{offset_6},{offset_7},{offset_8},{offset_9},{offset_10},{offset_11},{offset_12}".format(offset_1=ticker_values[0],offset_2=ticker_values[1],offset_3=ticker_values[2],offset_4=ticker_values[3],offset_5=ticker_values[4],offset_6=ticker_values[5],offset_7=ticker_values[6],offset_8=ticker_values[7],offset_9=ticker_values[8],offset_10=ticker_values[9],offset_11=ticker_values[10],offset_12=ticker_values[11])
-            tick_labels_as_str = tick_labels_as_str + "{month_1},{month_2},{month_3},{month_4},{month_5},{month_6},{month_7},{month_8},{month_9},{month_10},{month_11},{month_12}".format()
+             returns_values = returns[returns.index.str.contains(yearly_tickinfo_regex ,regex=True)]
+             ticker_values = returns_values['index_as_offset'].to_list()
+             ticker_dates = returns_values.index.to_list()
+             ticker_labels = [date[6:] if mydate[0:5] == "01-01" else self.month_num_to_month_name_mapping[date[3:5]] for date in ticker_dates]
         elif time_frame == "five_yearly":
-            ticks_as_str = ticks_as_str + "{offset_1},{offset_2},{offset_3},{offset_4},{offset_5},{offset_6},{offset_7},{offset_8},{offset_9}".format(offset_1=returns.at["01-01-{year}".format(year = int(year) -4),"index_as_offset"],offset_2=returns.at["01-07-{year}".format(year = int(year) -4),"index_as_offset"],offset_3=returns.at["01-01-{year}".format(year = int(year) -3),"index_as_offset"],offset_4=returns.at["01-07-{year}".format(year = int(year) -3),"index_as_offset"],offset_5=returns.at["01-01-{year}".format(year = int(year) -2),"index_as_offset"],offset_6=returns.at["01-07-{year}".format(year = int(year) -2),"index_as_offset"],offset_7=returns.at["01-01-{year}".format(year = int(year) -1),"index_as_offset"],index_8=returns.at["01-07-{year}".format(year = int(year) -1),"index_as_offset"],offset_9=returns.at[f"01-01-{year}","index_as_offset"])
-            tick_labels_as_str = tick_labels_as_str + "{first_year},Jul, {second_year},Jul, {third_year}, Jul, {fourth_year}, Jul,{fith_year}".format(first_year=int(year)-4,second_year=int(year) -3,third_year=int(year)-2,fourth_year=int(year) -1,fith_year=year)
-            
-
-            if month > 5:
-                ticks_as_str = ticks_as_str + ",{extra_ticker}".format(extracker_ticker=returns.at[f"01-06-{year}","index_as_offset"])
-                tick_labels_as_str = + ", Jul"
-        tickers_as_str = "{"
-        for ticker_offset in tickers:
-            tickers_as_str = tickers_as_str + f"{ticker_offset},"
-        tickers_as_str = tickers_as_str  + "}"
+            returns_values = returns[returns.index.str.contains(one_month_tickinfo_regex,regex=True)]
+            ticker_values = returns_values['index_as_offset'].to_list()
+            ticker_dates = returns_values.index.to_list()
+            ticker_labels = [date[6:] if mydate[0:5] == "01-01" else "Jul." for date in ticker_dates]
+        for ticker_value, ticker_label in zip(ticker_values[:-1],ticker_labels[:-1]):
+            ticks_as_str = ticks_as_str + f"{ticker_value},"
+            tick_labels_as_str =  tick_labels_as_str + f"{ticker_label},"
+        ticks_as_str = ticks_as_str + "{last_ticker_value}".format(last_ticker_value=ticker_values[-1])
+        tick_labels_as_str =  tick_labels_as_str + "{last_ticker_label_value}".format(last_ticker_label_value=ticker_labels[-1])
+        ticks_as_str  = ticks_as_str   + "}"
         tick_labels_as_str = tick_labels_as_str + "}"
+        title = self.range_to_title_mapping[time_frame]
         latex_report.write(f"""
-                           xtick={tickers_as_str},
-                           xticklabels={tick_labels_as_str},
-                           """)
-        
-            
+                           title={title}
+                           grid=both,
+                           xtick={ticks_as_str},
+                           xticklabels={tick_labels_as_str},""")
+        xtra_ticks = "{"
+        for i in range(1,len(returns)):
+            xtra_ticks = xtra_ticks + f"{i},"
+        xtra_ticks = xtra_ticks + "{last_tick}".format(last_tick = len(returns) )
+        xtra_ticks =  xtra_ticks + "}"
+        latex_report.write(f"""
+                  extra x ticks = {xtra_ticks},
+                  extra x tick style={{xticklabel={{}}}},""")
+        y_tick_values = [round(math.ceil(min(returns["holding_value"])), -1),round(math.ceil(min(returns["holding_value"] * 1.1)), -1),round(math.ceil(min(returns["holding_value"] * 1.2)), -1),round(math.ceil(min(returns["holding_value"] * 1.3)), -1),round(math.ceil(min(returns["holding_value"] * 1.4)), -1),round(math.ceil(min(returns["holding_value"] * 1.5)), -1),round(math.ceil(min(returns["holding_value"] * 1.6)), -1),round(math.ceil(min(returns["holding_value"] * 1.7)), -1),round(math.ceil(min(returns["holding_value"] * 1.8)), -1)]
+       # latex_report.write("""ymin={minimum},
+       #                    """.format(minimum=min(returns["holding_value"])))
+       # latex_report.write("""ymax={maximum},""".format(maximum=max(returns["holding_value"])))
+        y_ticks_as_str = "{"
+        for y_tick in y_tick_values:
+            y_ticks_as_str = y_ticks_as_str + f"{y_tick},"
+        y_ticks_as_str = y_ticks_as_str + "{last_value}".format(last_value=round(math.ceil(min(returns["holding_value"] * 1.9)), -1))
+        y_ticks_as_str = y_ticks_as_str + "}"
+         #ytick={yticks},
+        latex_report.write("""
+                          ylabel=Value of holding in {ref_currency},
+                          xlabel= Month,
+                          scale only axis,
+                          enlargelimits=false,
+                          axis equal=true""".format(ref_currency=self.scraper.reference_currency))
                                         
     def profiler_write_axis_begin(self,latex_report):
         latex_report.write("""
-                           \begin{axis}[
-                          """)
+                           \\begin{axis}[""")
     def profiler_write_axis_mid(self,latex_report):
         latex_report.write("""
                            ]
                           """)                      
     def profiler_write_axis_end(self,latex_report):
         latex_report.write("""
-                           \end{axis}
-                          """)
+                           \\end{axis}""")
     def profiler_write_monthly_returns_axis(self,latex_report, returns):
         latex_report.write("""
                            title={Returns on investment over a one month period},                 
@@ -141,24 +135,25 @@ class StockProfiler:
         returns_range = returns_range.copy()
         returns_range["index_as_offset"] = [x for x in range(len(returns_range),0,-1)]       
         self.profiler_write_tikz_begin(latex_report)
+        self.profiler_write_axis_begin(latex_report)
         if timeframe == "monthly":
-            self.profiler_write_monthly_returns_axis(latex_report, returns_range)
+            self.profiler_write_axis_information(latex_report, returns_range, "monthly")
         elif timeframe == "six_monthly":
-            pass
+            self.profiler_write_axis_information(latex_report, returns_range, "six_monthly")
         elif timeframe == "yearly":
-            self.profiler_write_yearly_returns_axis(latex_report, returns_range)
+            self.profiler_write_axis_information(latex_report, returns_range, "yearly")
         elif timeframe == "five_yearly":
             pass
+        self.profiler_write_axis_mid(latex_report)
+        latex_report.write("""\\addplot [color=red] coordinates {""")
+        for i in range(len(returns_range)-1):
+            latex_report.write("""({index},{value})
+                               """.format(index = i,value=returns_range.iloc[i]["holding_value"]))
+        latex_report.write("""({index},{value})""".format(index = len(returns_range)-1,value=returns_range.iloc[len(returns_range)-1]["holding_value"]))
         latex_report.write("""
-                           \addplot [color=red] coordinates
-                          """)
-        for i in range(len(returns_range)):
-            latex_report.write("""
-                           ({index},{value}) 
-                          """.format(index = i,value=returns_range.iloc[i]["holding_value"]))
-        latex_report.write("""
-                           };
-                          """)
+                           };""")
+
+        self.profiler_write_axis_end(latex_report)
         self.profiler_write_tikz_end(latex_report)
     def profiler_write_returns_yearly(self):
         pass
@@ -243,6 +238,7 @@ class StockProfiler:
         \\usepackage{pgf-pie}  
         \\usepackage{subcaption}
         \\usetikzlibrary {datavisualization} 
+        \\usepackage{pgfplots}
         \\date{Dated """ +  self.present_date + """ } """ 
         +
         
@@ -405,7 +401,7 @@ class StockProfiler:
    
 
     def profiler_write_performance_information(self, latex_report):
-        returns = returns = pd.read_csv("{userhome}/stockscraper_config/returns.csv".format(userhome=self.userhome),index_col=0)
+        returns = pd.read_csv("{userhome}/stockscraper_config/returns.csv".format(userhome=self.userhome),index_col=0)
         self.profiler_write_section_type(latex_report, "Portfolio performance", "section")
         self.profiler_write_section_type(latex_report, "Returns", "subsection")
         self.profiler_write_section_type(latex_report, "Monthly returns", "subsubsection")
