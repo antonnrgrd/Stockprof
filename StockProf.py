@@ -53,6 +53,10 @@ class StockProfiler:
             ticker_values = returns_values['index_as_offset'].to_list()
             ticker_dates = returns_values.index.to_list()
             ticker_labels = [date[6:] if mydate[0:5] == "01-01" else "Jul." for date in ticker_dates]
+        '''By how pandas adds values and how the return values are stored in the frame, we have to reverse
+        them s.t they are now from biggest value to smallest, to get the correct ticker-label values'''
+        ticker_values.reverse()
+        ticker_labels.reverse()
         for ticker_value, ticker_label in zip(ticker_values[:-1],ticker_labels[:-1]):
             ticks_as_str = ticks_as_str + f"{ticker_value},"
             tick_labels_as_str =  tick_labels_as_str + f"{ticker_label},"
@@ -148,8 +152,8 @@ class StockProfiler:
         latex_report.write("""\\addplot [color=red] coordinates {""")
         for i in range(len(returns_range)-1):
             latex_report.write("""({index},{value})
-                               """.format(index = i,value=returns_range.iloc[i]["holding_value"]))
-        latex_report.write("""({index},{value})""".format(index = len(returns_range)-1,value=returns_range.iloc[len(returns_range)-1]["holding_value"]))
+                               """.format(index = i+1,value=returns_range.iloc[i]["holding_value"]))
+        latex_report.write("""({index},{value})""".format(index = len(returns_range),value=returns_range.iloc[len(returns_range)-1]["holding_value"]))
         latex_report.write("""
                            };""")
 
