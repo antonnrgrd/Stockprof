@@ -54,9 +54,9 @@ class StockScraper:
         returns = pd.read_csv(f"{userhome}/stockscraper_config/returns.csv")          
         base = datetime.datetime.today()
         date_list = date_list = [(base - datetime.timedelta(days=x)).strftime("%d-%m-%Y") for x in range(365 * 5)]
-        return_values = [1000000]
+        return_values = [1000]
         for i in range((365 * 5) -1):
-            return_values.append(return_values[-1] * random.uniform(1.0001, 1.001))
+            return_values.append(return_values[-1] * random.uniform(1.01, 1.1))
        
         generated_holding_values = pd.DataFrame(return_values, index=date_list, columns=["holding_value"])
 

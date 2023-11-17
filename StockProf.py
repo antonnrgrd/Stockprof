@@ -35,10 +35,11 @@ class StockProfiler:
         ticker_labels = []
         tick_labels_as_str = "{"
         if time_frame == "monthly":
+            print(returns)
             returns_values = returns[returns.index.str.contains(one_month_tickinfo_regex,regex=True)]
             ticker_values = returns_values['index_as_offset'].to_list()
             ticker_dates = returns_values.index.to_list()
-            ticker_labels = [self.month_num_to_month_name_mapping[date[3:5]] if date[0:2] == "01" else date[3:] for date in ticker_dates]
+            ticker_labels = [self.month_num_to_month_name_mapping[date[3:5]] if date[0:2] == "01" else date[0:2] for date in ticker_dates]
         elif time_frame == "six_monthly":
              returns_values = returns[returns.index.str.contains(six_months_tickinfo_regex,regex=True)]
              ticker_values = returns_values['index_as_offset'].to_list()
@@ -67,7 +68,6 @@ class StockProfiler:
         title = self.range_to_title_mapping[time_frame]
         latex_report.write(f"""
                            title={title}
-                           grid=both,
                            xtick={ticks_as_str},
                            xticklabels={tick_labels_as_str},""")
         xtra_ticks = "{"
@@ -90,10 +90,7 @@ class StockProfiler:
          #ytick={yticks},
         latex_report.write("""
                           ylabel=Value of holding in {ref_currency},
-                          xlabel= Month,
-                          scale only axis,
-                          enlargelimits=false,
-                          axis equal=true""".format(ref_currency=self.scraper.reference_currency))
+                          xlabel= Month""".format(ref_currency=self.scraper.reference_currency))
                                         
     def profiler_write_axis_begin(self,latex_report):
         latex_report.write("""
