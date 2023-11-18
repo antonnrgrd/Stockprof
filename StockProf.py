@@ -7,8 +7,8 @@ import json
 import math
 from StockScraper import *
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
-one_month_tickinfo_regex = "^07-|^14-|^21-|^28-|^01|^01-01"
-six_months_tickinfo_regex = "^14-|28-|^01|^01-01"
+one_month_tickinfo_regex = "^07-|^14-|^21-|^01|^01-01"
+six_months_tickinfo_regex = "^14-|^01|^01-01"
 yearly_tickinfo_regex = "^01-|^01-01"
 five_years_tickinfo_regex = "^01-01-|^01-06"
 class StockProfiler:
@@ -35,7 +35,6 @@ class StockProfiler:
         ticker_labels = []
         tick_labels_as_str = "{"
         if time_frame == "monthly":
-            print(returns)
             returns_values = returns[returns.index.str.contains(one_month_tickinfo_regex,regex=True)]
             ticker_values = returns_values['index_as_offset'].to_list()
             ticker_dates = returns_values.index.to_list()
@@ -44,16 +43,17 @@ class StockProfiler:
              returns_values = returns[returns.index.str.contains(six_months_tickinfo_regex,regex=True)]
              ticker_values = returns_values['index_as_offset'].to_list()
              ticker_dates = returns_values.index.to_list()
+             ticker_labels = [self.month_num_to_month_name_mapping[date[3:5]] if date[0:2] == "01" else date[0:2] for date in ticker_dates]
         elif time_frame == "yearly":
              returns_values = returns[returns.index.str.contains(yearly_tickinfo_regex ,regex=True)]
              ticker_values = returns_values['index_as_offset'].to_list()
              ticker_dates = returns_values.index.to_list()
-             ticker_labels = [date[6:] if mydate[0:5] == "01-01" else self.month_num_to_month_name_mapping[date[3:5]] for date in ticker_dates]
+             ticker_labels = [date[6:] if date[0:5] == "01-01" else self.month_num_to_month_name_mapping[date[3:5]] for date in ticker_dates]
         elif time_frame == "five_yearly":
-            returns_values = returns[returns.index.str.contains(one_month_tickinfo_regex,regex=True)]
+            returns_values = returns[returns.index.str.contains(five_years_tickinfo_regex,regex=True)]
             ticker_values = returns_values['index_as_offset'].to_list()
             ticker_dates = returns_values.index.to_list()
-            ticker_labels = [date[6:] if mydate[0:5] == "01-01" else "Jul." for date in ticker_dates]
+            ticker_labels = [date[6:] if date[0:5] == "01-01" else "Jul." for date in ticker_dates]
         '''By how pandas adds values and how the return values are stored in the frame, we have to reverse
         them s.t they are now from biggest value to smallest, to get the correct ticker-label values'''
         ticker_values.reverse()
@@ -67,7 +67,7 @@ class StockProfiler:
         tick_labels_as_str = tick_labels_as_str + "}"
         title = self.range_to_title_mapping[time_frame]
         latex_report.write(f"""
-                           title={title}
+                           title={title},
                            xtick={ticks_as_str},
                            xticklabels={tick_labels_as_str},""")
         xtra_ticks = "{"
@@ -87,10 +87,14 @@ class StockProfiler:
             y_ticks_as_str = y_ticks_as_str + f"{y_tick},"
         y_ticks_as_str = y_ticks_as_str + "{last_value}".format(last_value=round(math.ceil(min(returns["holding_value"] * 1.9)), -1))
         y_ticks_as_str = y_ticks_as_str + "}"
-         #ytick={yticks},
         latex_report.write("""
                           ylabel=Value of holding in {ref_currency},
-                          xlabel= Month""".format(ref_currency=self.scraper.reference_currency))
+                          xlabel=Time,""".format(ref_currency=self.scraper.reference_currency))
+        '''If the time frame is greater than a monthly period, the number of ticks become too many to
+        fit on the axis horizontally, so we have to write them vertically'''
+        if time_frame != "monthly":
+             latex_report.write("""
+                                tick label style={rotate=90}""")
                                         
     def profiler_write_axis_begin(self,latex_report):
         latex_report.write("""
@@ -124,7 +128,7 @@ class StockProfiler:
         if timeframe == "monthly":
             returns_range = returns.iloc[0:30]
         elif timeframe == "six_monthly":
-            returns_range = returns.iloc[0:30]
+            returns_range = returns.iloc[0:180]
         elif timeframe == "yearly":
             returns_range = returns.iloc[0:365:]
         elif timeframe == "five_yearly":
@@ -144,7 +148,7 @@ class StockProfiler:
         elif timeframe == "yearly":
             self.profiler_write_axis_information(latex_report, returns_range, "yearly")
         elif timeframe == "five_yearly":
-            pass
+            self.profiler_write_axis_information(latex_report, returns_range, "five_yearly")
         self.profiler_write_axis_mid(latex_report)
         latex_report.write("""\\addplot [color=red] coordinates {""")
         for i in range(len(returns_range)-1):
@@ -407,7 +411,12 @@ class StockProfiler:
         self.profiler_write_section_type(latex_report, "Returns", "subsection")
         self.profiler_write_section_type(latex_report, "Monthly returns", "subsubsection")
         self.profiler_write_returns_period(latex_report, returns, "monthly")
-         
+        self.profiler_write_section_type(latex_report, "Six monthly returns", "subsubsection")
+        self.profiler_write_returns_period(latex_report, returns, "six_monthly")
+        self.profiler_write_section_type(latex_report, "Yearly returns", "subsubsection")
+        self.profiler_write_returns_period(latex_report, returns, "yearly") 
+        self.profiler_write_section_type(latex_report, "Five years returns", "subsubsection")
+        self.profiler_write_returns_period(latex_report, returns, "five_yearly") 
     def profiler_generate_report_info(self):
         userhome = os.path.expanduser('~')          
         if os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
