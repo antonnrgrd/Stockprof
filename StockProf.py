@@ -91,10 +91,12 @@ class StockProfiler:
                           ylabel=Value of holding in {ref_currency},
                           xlabel=Time,""".format(ref_currency=self.scraper.reference_currency))
         '''If the time frame is greater than a monthly period, the number of ticks become too many to
-        fit on the axis horizontally, so we have to write them vertically'''
+        fit on the axis horizontally, so we have to write them vertically. We also have to move the x-axis
+        label a bit further down to avoid overap with the tick labels'''
         if time_frame != "monthly":
              latex_report.write("""
-                                tick label style={rotate=90}""")
+                                tick label style={rotate=90},
+                                 x label style={at={(axis description cs:0.5,-0.1)},anchor=north}""")
                                         
     def profiler_write_axis_begin(self,latex_report):
         latex_report.write("""
