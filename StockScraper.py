@@ -9,6 +9,9 @@ from StockMailer import StockMailer
 import time
 import datetime
 import random
+import chromedriver_autoinstaller
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 #data-test="ASK-value">12,960.00 
 #currency_regex = "( Currency in )(([A-Za-z])+)"
 #(Currency in )([A-Za-z])+ \([0-9,]+\.[0-9]+ [A-Za-z]+\)
@@ -34,14 +37,30 @@ country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/
 
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
-#"(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)"
-
-#"(class=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z0-9\sæåøüÿëïöä\-,\.]+)(<br\/>)([a-zA-Z-\.\s]+)"
+stock_rating_regex = "(<li\sclass=\"analyst__option\sactive\">)([a-zA-Z]+)(<\/li>)"
 class StockScraper:
-    def __init__(self):
+    def __init__(self,advanced_webscrape=False):
         self.conversion_factors = {}
         self.reference_currency = None
         self.scraper_readin_config()
+        self.web_driver = None
+        self.element_waiter = None
+        '''Selenium adds a lot of "weight" to program. So we will only import it if we
+        need to webscrape dynamic elements from Yahoo'''
+        if advanced_webscrape:
+            from selenium.webdriver.chrome.options import Options
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            '''Ensure chromer driver is in path '''
+            chromedriver_autoinstaller.install()
+            chrome_options = Options()
+            #chrome_options.add_argument("--headless")
+            #self.web_driver = webdriver.Chrome(options=chrome_options)
+            self.web_driver = webdriver.Chrome()
+            self.web_driver.maximize_window()
+            self.element_waiter = WebDriverWait(self.web_driver , 10)
     def scraper_readin_config(self):
         userhome = os.path.expanduser('~')
         with open(f"{userhome}\\stockscraper_config\\config_info.json") as f:
@@ -187,8 +206,28 @@ class StockScraper:
         '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
         we would for each iteration append a coulumn to the df when writing it out'''
         tickers.to_csv("items.csv",index=False)
-                    
-                    
+
+    def scraper_get_stock_rating(self,url):
+        self.web_driver.get(url)
+        '''Handle the cookie consent popup that appears.
+        Find the button you want to click. This is done by finding an element with the name
+        reject'''
+        button = self.web_driver.find_element(By.NAME,'reject')
+        '''Click the button - by first scrolling down and then clicking. Sidenote - the amount 
+        required to scroll was a bit of a shot in the dark. This might not work for sufficiently
+        big enough screens maybe?'''
+        self.web_driver.execute_script("window.scrollTo(0, 200)")
+        button.click()
+        '''Wait until the dynamic elements have loaded. This sufficiently achieved
+        by waiting for the recommended tickers to appear'''
+        self.element_waiter.until(EC.presence_of_element_located((By.ID, "recommendations-by-symbol")))
+        '''Quite annoyingly, the selenium webdriver is not competent to find web elements
+        if the element in question is not physically visible on screen as seen from the view of an end user. So we scroll
+        down to the end of the page to make it visible'''
+        self.web_driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
+        anaylst_rating = self.web_driver.find_element(By.CSS_SELECTOR,"""[data-test="rec-rating-txt"]""")
+        return float(anaylst_rating.get_attribute("innerHTML"))
+                 
             
                 
             
