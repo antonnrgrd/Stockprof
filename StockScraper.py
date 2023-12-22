@@ -56,9 +56,8 @@ class StockScraper:
             '''Ensure chromer driver is in path '''
             chromedriver_autoinstaller.install()
             chrome_options = Options()
-            #chrome_options.add_argument("--headless")
-            #self.web_driver = webdriver.Chrome(options=chrome_options)
-            self.web_driver = webdriver.Chrome()
+            chrome_options.add_argument("--headless")
+            self.web_driver = webdriver.Chrome(options=chrome_options)
             self.web_driver.maximize_window()
             self.element_waiter = WebDriverWait(self.web_driver , 10)
     def scraper_readin_config(self):
@@ -207,6 +206,7 @@ class StockScraper:
         we would for each iteration append a coulumn to the df when writing it out'''
         tickers.to_csv("items.csv",index=False)
 
+        '''Assumes URL is formatted version of "Analysis" section to work '''
     def scraper_get_stock_rating(self,url):
         self.web_driver.get(url)
         '''Handle the cookie consent popup that appears.
