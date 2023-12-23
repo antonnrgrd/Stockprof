@@ -12,24 +12,16 @@ import random
 import chromedriver_autoinstaller
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-#data-test="ASK-value">12,960.00 
-#currency_regex = "( Currency in )(([A-Za-z])+)"
-#(Currency in )([A-Za-z])+ \([0-9,]+\.[0-9]+ [A-Za-z]+\)
-#currency_regex = "(Currency in )(([A-Za-z])+)"
-#currency_regex = "( Currency in )(([A-Za-z])+)|(Currency in )([A-Za-z])+ \([0-9,]+\.[0-9]+ [A-Za-z]+\)"
 currency_regex = "(Currency\sin\s)([A-Za-z]+)\s\([0-9,]+\.[0-9]+\s[A-Z]+\)|(Currency\sin\s)([A-Z]+)"
 currency_subregex_first_case = "(Currency\sin\s)([A-Za-z]+)\s\([0-9,]+\.[0-9]+\s([A-Z]+)\)"
 currency_subregex_second_case = "(Currency\sin\s)([A-Z]+)"
 '''Regex for getting current price is suprisingly tricky to get correct. Lots of false positives, the commented-out ones
 were old candidates, saved just in case'''
-#present_price_regex = "(data-pricehint=\"2\" value=\")(([0-9]|\.)+)"
-#present_price_regex = "(data-test=\"BID-value\">)([0-9\.,]+)"
 present_price_regex = "(FIN_TICKER_PRICE&quot;:&quot;)([0-9\.,]+)(&quot;)"
 dividend_yield_regex = "(\"DIVIDEND_AND_YIELD-value\">)(.+) \(([0-9]+\.[0-9]+%|N\/A)"
 one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9,]+\.[0-9]+|N\/A)"
 sector_regex = "(Sector\(s\)<\/span>:\s<span class=\"Fw\(600\)\">)(([a-zA-Z]|\s)+)(<\/span>)"
 industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;&,\-]+)"
-#country_regex = "(<\/h3><div\sclass=\"Mb\(25px\)\"><p\sclass=\"D\(ib\) W\(47\.727%\) Pend\(40px\)\">(<br\/>)(.+)<br\/>)([a-zA-Z]+)(<br\/>)"
 '''Behold, the ugliest regex known to man! the reason why this is so unsightly is that if we want to extract the location of the company
 we in the html code need to look for the adress, ending with the country in question. But there are so many ways you can specify an adress, with umlaut,
 hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
