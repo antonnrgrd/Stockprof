@@ -225,7 +225,7 @@ class StockProfiler:
                                
                                {} / {} 
                                
-                               """.format(currency_weighting.iloc[-1]["weighting"],currency_weighting[column].iloc[-1][column] ))
+                               """.format(currency_weighting.iloc[-1]["weighting"],currency_weighting.iloc[-1][column] ))
         latex_report.write(""" 
                            }
                            """)
@@ -381,7 +381,7 @@ class StockProfiler:
              remaining_weight = 1 - biggest_country_holdings['weighting'].sum()
              self.profiler_write_pchart(latex_report, biggest_country_holdings,"country",2, 4, 0, remaining_weight)
         else:
-            self.profiler_write_pchart(latex_report, biggest_country_holdings,"country",2, 4, 0)
+            self.profiler_write_pchart(latex_report, country_weighting,"country",2, 4, 0)
         self.profiler_write_tikz_end(latex_report)
         self.profiler_write_section_type(latex_report, "Distribution of sectors and industries", "subsection")
         
@@ -393,13 +393,13 @@ class StockProfiler:
             remaining_weight = 1 - biggest_sector_holdings['weighting'].sum()
             self.profiler_write_pchart(latex_report, biggest_sector_holdings,"sector",2, -3, 0, remaining_weight)
         else:
-            self.profiler_write_pchart(latex_report, currency_holdings,"currency",2, -3, 0)
+            self.profiler_write_pchart(latex_report, sector_weighting,"sector",2, -3, 0)
         if len(industry_holdings) > 5:
              biggest_industry_holdings = industry_weighting.nlargest(5, columns=['weighting']).reset_index()
              remaining_weight = 1 - biggest_country_holdings['weighting'].sum()
              self.profiler_write_pchart(latex_report, biggest_industry_holdings,"industry",2, 4, 0, remaining_weight)
         else:
-            self.profiler_write_pchart(latex_report, biggest_industry_holdings,"country",2, 4, 0)
+            self.profiler_write_pchart(latex_report, industry_weighting,"industry",2, 4, 0)
         self.profiler_write_tikz_end(latex_report)
         self.profiler_write_section_type(latex_report, "Top stocks by weighting", "subsection")   
    
