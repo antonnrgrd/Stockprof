@@ -216,16 +216,13 @@ class StockProfiler:
         weight it is between 0-1, so we multiply by 100 to ensure it has this property. Furthermore, tikz expect the values to sum abou 100
         or close to, in order to render the pie chart correctly, so we round them up to nudgde it in that direction, at the cost of some accuracy'''
         for index in range (len(currency_weighting)-1):
-            latex_report.write("""{fraction} / {value}  , """.format(fraction=math.ceil(currency_weighting.at[index,'weighting'] * 100) ,value=currency_weighting.at[index,column] ))
+            latex_report.write("""{fraction} / {value}  , 
+                               """.format(fraction=math.ceil(currency_weighting.at[index,'weighting'] * 100) ,value=currency_weighting.at[index,column] ))
         if remaining_weighting != None:
             latex_report.write("""{fraction} / Other """.format(fraction=math.ceil(remaining_weighting * 100)))
         else:
-            latex_report.write(""", """)
-            latex_report.write("""
-                               
-                               {} / {} 
-                               
-                               """.format(currency_weighting.iloc[-1]["weighting"],currency_weighting.iloc[-1][column] ))
+            latex_report.write("""   
+                               {} / {}""".format(currency_weighting.iloc[-1]["weighting"],currency_weighting.iloc[-1][column] ))
         latex_report.write(""" 
                            }
                            """)
