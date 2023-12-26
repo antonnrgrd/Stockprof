@@ -49,8 +49,6 @@ class StockScrapeConfig:
             return
         os.chdir("stockscraper_config")
         tickers = pd.read_csv("items.csv")
-        print(tickers)
-        print(self.config_extract_provided_values(args_as_dict))
         tickers =  pd.concat([self.config_extract_provided_values(args_as_dict), tickers],ignore_index=True)
         tickers.to_csv("items.csv",index=False)
 
