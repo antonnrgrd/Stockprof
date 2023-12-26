@@ -221,8 +221,7 @@ class StockProfiler:
         if remaining_weighting != None:
             latex_report.write("""{fraction} / Other """.format(fraction=math.ceil(remaining_weighting * 100)))
         else:
-            latex_report.write("""   
-                               {} / {}""".format(currency_weighting.iloc[-1]["weighting"],currency_weighting.iloc[-1][column] ))
+            latex_report.write("""{} / {}""".format(currency_weighting.iloc[-1]["weighting"],currency_weighting.iloc[-1][column] ))
         latex_report.write(""" 
                            }
                            """)
