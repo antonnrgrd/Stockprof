@@ -25,18 +25,18 @@ class StockScrapeConfig:
         os.chdir("stockscraper_config")
         with open('config_info.json', 'w') as f:
             json.dump({"email": email, "password":password, "error_state": False, 'ref_currency':ref_currency.upper(), "row_id": None},f)
-        tickers = pd.DataFrame(columns = ['ticker','currency', 'current_price', 'initial_price', 'holding', 'alert_threshold'])
-        tickers.to_csv('items.csv')
+        tickers = pd.DataFrame(columns = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country','analyst_rating'])
+        tickers.to_csv('items.csv',index=False)
         holding_value = pd.DataFrame(columns = ['holding_value'])
         holding_value.to_csv('returns.csv',index=False)
     
     def config_extract_provided_values(self, args_as_dict):
         
-        tikr_values = [[np.NaN, "undef", np.NaN, np.NaN, np.NaN, np.NaN,np.NaN,"undef","undef", "undef"]]
+        tikr_values = [[np.NaN, "undef", np.NaN, np.NaN, np.NaN, np.NaN,np.NaN,"undef","undef", "undef", "undef"]]
         for argument in  args_as_dict:
            if argument in attr_index_mapping:
               tikr_values[0][attr_index_mapping[argument]] = args_as_dict[argument]
-        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country'])      
+        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country','analyst_rating'])      
         return tikr_values
                     
         
@@ -48,13 +48,11 @@ class StockScrapeConfig:
             print('Couldn\'t find settings folder. Please run a config first')
             return
         os.chdir("stockscraper_config")
-        tickers = pd.read_csv("items.csv",index_col=0)
-        self.config_extract_provided_values(args_as_dict)
-        tickers =  pd.concat([self.config_extract_provided_values(args_as_dict), tickers],ignore_index=True)
-        '''Important sitenote, we want to include the integer indexes as a column due to how we iterate over the rows when scraping information
-        so we do not set it to false here'''
+        tickers = pd.read_csv("items.csv")
         print(tickers)
-        tickers.to_csv("items.csv")
+        print(self.config_extract_provided_values(args_as_dict))
+        tickers =  pd.concat([self.config_extract_provided_values(args_as_dict), tickers],ignore_index=True)
+        tickers.to_csv("items.csv",index=False)
 
                 
 

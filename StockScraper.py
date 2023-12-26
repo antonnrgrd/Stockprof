@@ -167,32 +167,21 @@ class StockScraper:
             return int(value) * 1000000000
         else:
             return int(value)
-    def scraper_update_ticker(self,row,df,updated_info): 
-        df.at[row["Unnamed: 0"],'country']=updated_info["country"]
-        df.at[row["Unnamed: 0"],'currency']=updated_info["currency"]
-        df.at[row["Unnamed: 0"],'sector']=updated_info["sector"]
-        df.at[row["Unnamed: 0"],'industry']=updated_info["industry"]
-        df.at[row["Unnamed: 0"],'target_price']=updated_info["target_price"]
-        df.at[row["Unnamed: 0"],'current_price']= updated_info["current_price"] if updated_info["current_price"] != "N/A" else np.NaN
-        df.at[row["Unnamed: 0"],'target_price']= updated_info["target_price"] 
+    def scraper_update_ticker(self,df,updated_info,index): 
+        df.at[index,'country']=updated_info["country"]
+        df.at[index,'currency']=updated_info["currency"]
+        df.at[index,'sector']=updated_info["sector"]
+        df.at[index,'industry']=updated_info["industry"]
+        df.at[index,'target_price']=updated_info["target_price"]
+        df.at[index,'current_price']= updated_info["current_price"] if updated_info["current_price"] != "N/A" else np.NaN
+        df.at[index,'target_price']= updated_info["target_price"] 
     def check_items(self):
         userhome = os.path.expanduser('~')          
         os.chdir("{home}/stockscraper_config".format(home=userhome))
         tickers = pd.read_csv("items.csv")
-        for item in tickers.to_dict(orient="records"):
-            print(item)
-            ticker_info = self.scraper_all_item_info(item["ticker"])
-            price_change = None
-            returns = None
-        #    if item["current_price"] != np.NaN:
-         #       price_change = item["current_price"] /  ticker_info["current_price"]
-         #       if not np.isnan(item['holding']) and not np.isnan(item['initial_price']):
-         #           returns = (item['holding'] * item['initial_price']) / (item['holding'] * price_change)    
-         #   if price_change and item["current_price"] and item['alert_threshold'] and price_change >= item['alert_threshold']:
-         #       self.status.add_formatted_alert(item["ticker"], item["current_price"], price_change. returns,item['holding'] )
-         #   else:
-         #       self.status.add_formatted_info(item["ticker"], item["current_price"], price_change, returns,item['holding'] )
-            self.scraper_update_ticker(item, tickers,ticker_info)
+        for ticker_index in tickers.index:
+            ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
+            self.scraper_update_ticker(tickers,ticker_info,ticker_index)
         #self.mailer.stock_mailer_mail_update(self.status)
         '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
         we would for each iteration append a coulumn to the df when writing it out'''
