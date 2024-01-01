@@ -30,6 +30,10 @@ country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
 stock_rating_regex = "(<li\sclass=\"analyst__option\sactive\">)([a-zA-Z]+)(<\/li>)"
+
+trailing_pe_element_index = 2
+peg_element_index = 4
+pb_element_index = 6
 class StockScraper:
     def __init__(self,advanced_webscrape=False):
         self.conversion_factors = {}
@@ -50,6 +54,7 @@ class StockScraper:
             chrome_options = Options()
             chrome_options.add_argument("--headless")
             self.web_driver = webdriver.Chrome(options=chrome_options)
+            #self.web_driver = webdriver.Chrome()
             self.web_driver.maximize_window()
             self.element_waiter = WebDriverWait(self.web_driver , 10)
     def scraper_readin_config(self):
@@ -160,13 +165,19 @@ class StockScraper:
         statistics = r.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}",headers={'User-Agent': 'Custom'}).text
         financials = r.get(f"https://finance.yahoo.com/quote/{ticker}/financials?p={ticker}",headers={'User-Agent': 'Custom'}).text
         return stock_info
-    def scraper_convert_to_numerical(self,value):
+    
+    '''Large values are represented in shorthand with B for billion and M for million.
+    This converts them to the actual values'''
+    def scraper_convert_to_shorthand_number_to_real_number(self,value):
         if "M" in value:
-            return int(value) * 1000000
+            return float(value.replace("M", "")) * 1000000
         elif "B" in value:
-            return int(value) * 1000000000
+            return float(value.replace("B", "")) * 1000000000
         else:
-            return int(value)
+            return float(value)
+    def scraper_get_value_in_ref_currency(self,value,stock_info):
+        return self.conversion_factors[stock_info["currency"]] * self.scraper_convert_to_shorthand_number_to_real_number(value)
+    
     def scraper_update_ticker(self,df,updated_info,index): 
         df.at[index,'country']=updated_info["country"]
         df.at[index,'currency']=updated_info["currency"]
@@ -182,14 +193,13 @@ class StockScraper:
         for ticker_index in tickers.index:
             ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
             self.scraper_update_ticker(tickers,ticker_info,ticker_index)
-        #self.mailer.stock_mailer_mail_update(self.status)
         '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
         we would for each iteration append a coulumn to the df when writing it out'''
         tickers.to_csv("items.csv",index=False)
 
         '''Assumes URL is formatted version of "Analysis" section to work '''
-    def scraper_get_stock_rating(self,url):
-        self.web_driver.get(url)
+    def scraper_get_stock_rating(self,ticker,stock_info_dict):
+        self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}")
         '''Handle the cookie consent popup that appears.
         Find the button you want to click. This is done by finding an element with the name
         reject'''
@@ -208,8 +218,24 @@ class StockScraper:
         self.web_driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
         anaylst_rating = self.web_driver.find_element(By.CSS_SELECTOR,"""[data-test="rec-rating-txt"]""")
         return float(anaylst_rating.get_attribute("innerHTML"))
-                 
-            
+    def scraper_advanced_get_statistics_info(self,ticker,stock_info_dict):
+        self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}") 
+        '''Handle the cookie consent popup that appears.
+        Find the button you want to click. This is done by finding an element with the name
+        reject'''
+        self.web_driver.execute_script("window.scrollTo(0, 200)")
+        button = self.web_driver.find_element(By.NAME,'reject')             
+        '''Click the button - by first scrolling down and then clicking. Sidenote - the amount 
+        required to scroll was a bit of a shot in the dark. This might not work for sufficiently
+        big enough screens maybe?'''
+        self.web_driver.execute_script("window.scrollTo(0, 300)")
+        button.click()
+
+        stock_info_dict["pb_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[pb_element_index].text  
+        stock_info_dict["pe_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[trailing_pe_element_index].text
+        stock_info_dict["peg_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[peg_element_index].text
+
+        
                 
             
         
