@@ -32,11 +32,11 @@ class StockScrapeConfig:
     
     def config_extract_provided_values(self, args_as_dict):
         
-        tikr_values = [[np.NaN, "undef", np.NaN, np.NaN, np.NaN, np.NaN,np.NaN,"undef","undef", "undef", "undef"]]
+        tikr_values = [[np.NaN, "undef", np.NaN, np.NaN, np.NaN, np.NaN,np.NaN,"undef","undef", "undef", "undef",np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN]]
         for argument in  args_as_dict:
            if argument in attr_index_mapping:
               tikr_values[0][attr_index_mapping[argument]] = args_as_dict[argument]
-        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country','analyst_rating'])      
+        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country','analyst_rating','pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin'])      
         return tikr_values
                     
         
@@ -64,7 +64,6 @@ class StockScrapeConfig:
 
 def main():
     config = StockScrapeConfig()
-    scraper = StockScraper()
     parser = argparse.ArgumentParser()
     parser.add_argument('--email', action="store", required=False, default=None, nargs=1)
     parser.add_argument('--password', action="store", required=False, default=None)
@@ -80,12 +79,15 @@ def main():
     parser.add_argument('--alert_threshold', action="store", required=False, default=np.NAN)
     parser.add_argument('--overwrite', action="store_true", default=False)
     parser.add_argument('--ref_currency', action="store", default=False)
+    parser.add_argument('--advanced_webscrape',action="store_true")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--update_items', action="store_true")
     group.add_argument('--additem', action="store_true")
     group.add_argument('--config', action="store_true")
     group.add_argument('--compute_returns',action="store_true")
     args = parser.parse_args()
+
+    scraper = StockScraper(args.advanced_webscrape)
     if args.config:
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]
@@ -106,7 +108,7 @@ def main():
         else:
             print('Errror, provide at least the ticker of the stock')
     elif args.update_items:
-        scraper.check_items()
+        scraper.scraper_update_ticker_info()
     elif args.compute_returns:
         scraper.scraper_get_daily_returns()
     
