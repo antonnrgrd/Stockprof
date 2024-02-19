@@ -41,9 +41,11 @@ class StockScraper:
         self.scraper_readin_config()
         self.web_driver = None
         self.element_waiter = None
+        self.advanced_webscrape = False
         '''Selenium adds a lot of "weight" to program. So we will only import it if we
         need to webscrape dynamic elements from Yahoo'''
         if advanced_webscrape:
+            self.advanced_webscrape = True
             from selenium.webdriver.chrome.options import Options
             from selenium import webdriver
             from selenium.webdriver.common.by import By
@@ -51,10 +53,10 @@ class StockScraper:
             from selenium.webdriver.support import expected_conditions as EC
             '''Ensure chromer driver is in path '''
             chromedriver_autoinstaller.install()
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")
-            self.web_driver = webdriver.Chrome(options=chrome_options)
-            #self.web_driver = webdriver.Chrome()
+            #chrome_options = Options()
+            #chrome_options.add_argument("--headless")
+            #self.web_driver = webdriver.Chrome(options=chrome_options)
+            self.web_driver = webdriver.Chrome()
             self.web_driver.maximize_window()
             self.element_waiter = WebDriverWait(self.web_driver , 10)
     def scraper_readin_config(self):
@@ -117,6 +119,11 @@ class StockScraper:
         '''We include the conversion factor of the reference currency ( i.e 1), since it allow us to skimp on a lot of logic
         when converting the currencies to the reference currency'''
         self.conversion_factors[self.reference_currency] = 1
+    
+    def scraper_scrape_all_ticker_info_advanced(self, ticker,stock_info):
+        stock_info['analyst_rating'] = self.scraper_get_stock_rating(ticker,stock_info)
+        self.scraper_advanced_get_statistics_info(ticker, stock_info)
+    
     def scraper_all_item_info(self,ticker):
         stock_info = {}
         summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'})
@@ -162,8 +169,6 @@ class StockScraper:
         stock_info["current_price"] = float(extracted_price.replace(",", "")) if extracted_price != "N/A" else np.NaN
         stock_info["target_price"] = float(exracted_target_price.replace(",", "")) if exracted_target_price != "N/A" else np.NaN
         stock_info["dividend_yield"] = extracted_dividend_yield if extracted_dividend_yield != "N/A" else np.NaN
-        statistics = r.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}",headers={'User-Agent': 'Custom'}).text
-        financials = r.get(f"https://finance.yahoo.com/quote/{ticker}/financials?p={ticker}",headers={'User-Agent': 'Custom'}).text
         return stock_info
     
     '''Large values are represented in shorthand with B for billion and M for million.
@@ -185,14 +190,27 @@ class StockScraper:
         df.at[index,'industry']=updated_info["industry"]
         df.at[index,'target_price']=updated_info["target_price"]
         df.at[index,'current_price']= updated_info["current_price"] if updated_info["current_price"] != "N/A" else np.NaN
-        df.at[index,'target_price']= updated_info["target_price"] 
-    def check_items(self):
+        df.at[index,'target_price']= updated_info["target_price"]
+    
+    def scraper_update_ticker_advanced(self,df,updated_info,index): 
+        df.at[index,'analyst_rating']=updated_info["analyst_rating"]
+        df.at[index,'pb_ratio']=updated_info["pb_ratio"]
+        df.at[index,'pe_ratio']=updated_info["pe_ratio"]
+        df.at[index,'peg_ratio']=updated_info["peg_ratio"]
+    def scraper_update_ticker_info(self):
         userhome = os.path.expanduser('~')          
         os.chdir("{home}/stockscraper_config".format(home=userhome))
         tickers = pd.read_csv("items.csv")
         for ticker_index in tickers.index:
             ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
             self.scraper_update_ticker(tickers,ticker_info,ticker_index)
+            '''For some reason, just checking if the web driver is not None is not sufficient
+            and Python does not pick up on said check, so we have to check if the advanced_webscrape 
+            variable is true instead'''
+            if self.advanced_webscrape:
+                advanced_ticker_info = {}
+                self.scraper_get_stock_rating(tickers.at[ticker_index, "ticker"],advanced_ticker_info)
+                self.scraper_advanced_get_statistics_info(tickers.at[ticker_index, "ticker"],advanced_ticker_info)
         '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
         we would for each iteration append a coulumn to the df when writing it out'''
         tickers.to_csv("items.csv",index=False)
@@ -235,7 +253,28 @@ class StockScraper:
         stock_info_dict["pe_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[trailing_pe_element_index].text
         stock_info_dict["peg_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[peg_element_index].text
 
-        
+    def scraper_map_float_to_int(self, rating):
+        if rating <=2:
+            return 1
+        elif rating <=3:
+            return 2
+        elif rating <=4:
+            return 3
+        elif rating <=5:
+            return 4
+        else:
+            return 5
+    def scraper_map_num_rating_to_str_rating(self, rating):
+        if rating <=2:
+            return ("Strong buy", rating)
+        elif rating <=3:
+            return ("Buy", rating)
+        elif rating <=4:
+            return ("Hold", rating)
+        elif rating <=5:
+            return ("Underperform", rating)
+        else:
+            return ("Sell", rating)    
                 
             
         
