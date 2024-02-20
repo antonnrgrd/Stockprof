@@ -15,7 +15,7 @@ class StockScrapeConfig:
             pass
         elif os.lower() == "linux":
             pass
-    def config_setup(self, email,password,recipients,ref_currency):
+    def config_setup(self,ref_currency):
         '''Makes some assumptions that aren't always true. There is no constraint that requires the username to appear in the homedir path on Linux. 
         It just happens to be the case most of the time, but a sysadmin can set a user's homedir to whatever they want '''
         userhome = os.path.expanduser('~')          
@@ -24,7 +24,7 @@ class StockScrapeConfig:
             os.makedirs("stockscraper_config")
         os.chdir("stockscraper_config")
         with open('config_info.json', 'w') as f:
-            json.dump({"email": email, "password":password, "error_state": False, 'ref_currency':ref_currency.upper(), "row_id": None},f)
+            json.dump({"error_state": False, 'ref_currency':ref_currency.upper(), "row_id": None},f)
         tickers = pd.DataFrame(columns = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country','analyst_rating', 'pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin'])
         tickers.to_csv('items.csv',index=False)
         holding_value = pd.DataFrame(columns = ['holding_value'])
@@ -65,9 +65,6 @@ class StockScrapeConfig:
 def main():
     config = StockScrapeConfig()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--email', action="store", required=False, default=None, nargs=1)
-    parser.add_argument('--password', action="store", required=False, default=None)
-    parser.add_argument('--recipients', action="store", required=False, default=None)
     parser.add_argument('--ticker', action="store", required=False, default=None, type=str)
     parser.add_argument('--reference_currency', action="store", required=False, default=None, type=str)
     '''Default values are set to undef, rather than N/A, because if you do, then when pandas 
@@ -91,13 +88,10 @@ def main():
     if args.config:
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]
-        if os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv") and args.overwrite or not os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
-            if args.email:
-                print('Setting up script')
-                config.config_setup(args.email,args.password,args.recipients,args.ref_currency)
-                print('Setup complete')
-            else:
-                print('Error, attempted to config pyexchange without an email')
+        if os.path.isfile(f"{userhome}/stockscraper_config/items.csv") and args.overwrite or not os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
+            print('Setting up script')
+            config.config_setup(args.ref_currency)
+            print('Setup complete')
         else:
             print('Config file already found to be present. Run the config with --overwrite to overwrite the existing configuration')
     elif args.additem:
