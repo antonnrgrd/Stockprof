@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from StockScraper import *
 import sys
+from StockProf import StockProfiler
 attr_index_mapping = {'ticker':0,'currency':1, 'current_price':2, 'initial_price':3, 'holding':4,'alert_threshold':5}
 class StockScrapeConfig:
     def setup_scraper_script(self):
@@ -82,6 +83,8 @@ def main():
     group.add_argument('--additem', action="store_true")
     group.add_argument('--config', action="store_true")
     group.add_argument('--compute_returns',action="store_true")
+    group.add_argument('--portfolio_report',action="store_true")
+    group.add_argument('--generate_dummy_returns',action="store_true")
     args = parser.parse_args()
 
 
@@ -110,6 +113,12 @@ def main():
     elif args.compute_returns:
         scraper = StockScraper(args.advanced_webscrape)
         scraper.scraper_get_daily_returns()
+    elif args.generate_dummy_returns:
+        scraper = StockScraper(args.advanced_webscrape)
+        scraper.scraper_generate_dummy_returns()
+    elif args.portfolio_report:
+        profiler = StockProfiler()
+        profiler.profiler_generate_report_info()
     
          
             
