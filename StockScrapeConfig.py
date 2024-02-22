@@ -84,7 +84,7 @@ def main():
     group.add_argument('--compute_returns',action="store_true")
     args = parser.parse_args()
 
-    scraper = StockScraper(args.advanced_webscrape)
+
     if args.config:
         userhome = os.path.expanduser('~')          
         user = os.path.split(userhome)[-1]
@@ -101,9 +101,14 @@ def main():
             config.config_add_item_list(vars(args))
         else:
             print('Errror, provide at least the ticker of the stock')
+        '''I would have preferred to only initialize it once at a more outer scope, but initializing
+        a StockerScraper object involves reading in a users config, which would fail if they had not
+        already run a config setup.'''
     elif args.update_items:
+        scraper = StockScraper(args.advanced_webscrape)
         scraper.scraper_update_ticker_info()
     elif args.compute_returns:
+        scraper = StockScraper(args.advanced_webscrape)
         scraper.scraper_get_daily_returns()
     
          
