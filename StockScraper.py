@@ -61,7 +61,7 @@ class StockScraper:
             self.element_waiter = WebDriverWait(self.web_driver , 10)
     def scraper_readin_config(self):
         userhome = os.path.expanduser('~')
-        with open(f"{userhome}\\stockscraper_config\\config_info.json") as f:
+        with open(f"{userhome}/stockscraper_config/config_info.json") as f:
             config_info = json.load(f)
             self.reference_currency = config_info["ref_currency"]
         
