@@ -426,7 +426,7 @@ class StockProfiler:
 
             
             userhome = os.path.expanduser('~') 
-            with open("{}\\stockscraper_config\\{}.tex".format(userhome, self.title), 'w') as report:
+            with open("{}/stockscraper_config/{}.tex".format(userhome, self.title), 'w') as report:
                 self.profiler_write_preamble(report)
                
                 self.profiler_write_performance_information(report)
