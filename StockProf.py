@@ -6,6 +6,7 @@ import re
 import json
 import math
 from StockScraper import *
+import subprocess
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 one_month_tickinfo_regex = "^07-|^14-|^21-|^01|^01-01"
 six_months_tickinfo_regex = "^14-|^01|^01-01"
@@ -419,8 +420,8 @@ class StockProfiler:
             self.scraper.scraper_get_currency_conv_factors(tickers)
             self.profiler_sanitize_ticker_data(tickers)
             tickers['returns'] = tickers.initial_price / tickers.current_price
-            biggest_return_p =  tickers.loc[tickers['returns'].idxmax()]
-            biggest_loss_return_p =  tickers.loc[tickers['returns'].idxmin()]
+       #     biggest_return_p =  tickers.loc[tickers['returns'].idxmax()]
+       #     biggest_loss_return_p =  tickers.loc[tickers['returns'].idxmin()]
             
             
 
@@ -435,7 +436,7 @@ class StockProfiler:
                 self.profiler_write_section_type(report, "Currency conversion rates", "subsection")                
                 self.profiler_write_currency_conversion_info(report)
                 self.profiler_write_ending(report)
-                 
+            subprocess.run(["pdflatex", f"-output-directory={userhome}/stockscraper_config/", f"{userhome}/stockscraper_config/{self.title}"])       
 
 
                      
