@@ -436,7 +436,8 @@ class StockProfiler:
                 self.profiler_write_section_type(report, "Currency conversion rates", "subsection")                
                 self.profiler_write_currency_conversion_info(report)
                 self.profiler_write_ending(report)
-            subprocess.run(["pdflatex", f"-output-directory={userhome}/stockscraper_config/", f"{userhome}/stockscraper_config/{self.title}"])       
+            subprocess.run(["pdflatex", "--interaction=batchmode" , f"-output-directory={userhome}/stockscraper_config/", f"{userhome}/stockscraper_config/{self.title}"])
+            print(f"You can find your report at {userhome}/stockscraper_config")
 
 
                      
