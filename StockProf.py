@@ -414,8 +414,8 @@ class StockProfiler:
         self.profiler_write_returns_period(latex_report, returns, "five_yearly") 
     def profiler_generate_report_info(self):
         userhome = os.path.expanduser('~')          
-        if os.path.isfile(f"{userhome}\\stockscraper_config\\items.csv"):
-            tickers =  pd.read_csv(f"{userhome}\\stockscraper_config\\items.csv")
+        if os.path.isfile(f"{userhome}/stockscraper_config/items.csv"):
+            tickers =  pd.read_csv(f"{userhome}/stockscraper_config/items.csv")
             self.scraper.scraper_get_currency_conv_factors(tickers)
             self.profiler_sanitize_ticker_data(tickers)
             tickers['returns'] = tickers.initial_price / tickers.current_price
