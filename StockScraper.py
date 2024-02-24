@@ -201,23 +201,30 @@ class StockScraper:
         userhome = os.path.expanduser('~')          
         os.chdir("{home}/stockscraper_config".format(home=userhome))
         tickers = pd.read_csv("items.csv")
-        for ticker_index in tickers.index:
-            ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
-            self.scraper_update_ticker(tickers,ticker_info,ticker_index)
-            '''For some reason, just checking if the web driver is not None is not sufficient
-            and Python does not pick up on said check, so we have to check if the advanced_webscrape 
-            variable is true instead'''
-            if self.advanced_webscrape:
+        if self.advanced_webscrape:
+            self.scraper_advanced_get_past_cookie_section()
+            for ticker_index in tickers.index:
+                print(f"Scraping {tickers.at[ticker_index, 'ticker']}")
+                ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
+                self.scraper_update_ticker(tickers,ticker_info,ticker_index)
                 advanced_ticker_info = {}
                 self.scraper_get_stock_rating(tickers.at[ticker_index, "ticker"],advanced_ticker_info)
                 self.scraper_advanced_get_statistics_info(tickers.at[ticker_index, "ticker"],advanced_ticker_info)
-        '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
-        we would for each iteration append a coulumn to the df when writing it out'''
+                self.scraper_advanced_update_ticker_info(tickers,ticker_index,advanced_ticker_info)
+        else:        
+                
+            for ticker_index in tickers.index:
+                ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
+                self.scraper_update_ticker(tickers,ticker_info,ticker_index)
+            '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
+            we would for each iteration append a coulumn to the df when writing it out'''
         tickers.to_csv("items.csv",index=False)
-
-        '''Assumes URL is formatted version of "Analysis" section to work '''
-    def scraper_get_stock_rating(self,ticker,stock_info_dict):
-        self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}")
+        print("Completed webscrape successfully")
+        '''When first "visiting" the site during the webscrape, the cookie
+        consent popup will appear. We have to deal with this first before
+        the scraping can commence'''
+    def scraper_advanced_get_past_cookie_section(self):
+        self.web_driver.get("https://finance.yahoo.com")
         '''Handle the cookie consent popup that appears.
         Find the button you want to click. This is done by finding an element with the name
         reject'''
@@ -227,6 +234,9 @@ class StockScraper:
         big enough screens maybe?'''
         self.web_driver.execute_script("window.scrollTo(0, 200)")
         button.click()
+        '''Assumes URL is formatted version of "Analysis" section to work '''
+    def scraper_get_stock_rating(self,ticker,stock_info_dict):
+        self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}")
         '''Wait until the dynamic elements have loaded. This sufficiently achieved
         by waiting for the recommended tickers to appear'''
         self.element_waiter.until(EC.presence_of_element_located((By.ID, "recommendations-by-symbol")))
@@ -234,25 +244,16 @@ class StockScraper:
         if the element in question is not physically visible on screen as seen from the view of an end user. So we scroll
         down to the end of the page to make it visible'''
         self.web_driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
-        anaylst_rating = self.web_driver.find_element(By.CSS_SELECTOR,"""[data-test="rec-rating-txt"]""")
-        return float(anaylst_rating.get_attribute("innerHTML"))
+        analyst_rating = self.web_driver.find_element(By.CSS_SELECTOR,"""[data-test="rec-rating-txt"]""")
+        analyst_rating = float(analyst_rating.get_attribute("innerHTML"))
+        analyst_rating = self.scraper_map_num_rating_to_str_rating(analyst_rating)
+        stock_info_dict['analyst_rating'] = analyst_rating
     def scraper_advanced_get_statistics_info(self,ticker,stock_info_dict):
-        self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}") 
-        '''Handle the cookie consent popup that appears.
-        Find the button you want to click. This is done by finding an element with the name
-        reject'''
-        self.web_driver.execute_script("window.scrollTo(0, 200)")
-        button = self.web_driver.find_element(By.NAME,'reject')             
-        '''Click the button - by first scrolling down and then clicking. Sidenote - the amount 
-        required to scroll was a bit of a shot in the dark. This might not work for sufficiently
-        big enough screens maybe?'''
-        self.web_driver.execute_script("window.scrollTo(0, 300)")
-        button.click()
+        self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}")          
 
         stock_info_dict["pb_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[pb_element_index].text  
         stock_info_dict["pe_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[trailing_pe_element_index].text
         stock_info_dict["peg_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[peg_element_index].text
-
     def scraper_map_float_to_int(self, rating):
         if rating <=2:
             return 1
@@ -275,8 +276,11 @@ class StockScraper:
             return ("Underperform", rating)
         else:
             return ("Sell", rating)    
-                
-            
+    def scraper_advanced_update_ticker_info(self, tickers_df,index,advanced_updated_info):
+        tickers_df.at[index,'pb_ratio'] = advanced_updated_info['pb_ratio']
+        tickers_df.at[index,'pe_ratio'] = advanced_updated_info['pe_ratio']
+        tickers_df.at[index,'peg_ratio'] = advanced_updated_info['peg_ratio']  
+        tickers_df.at[index,'analyst_rating'] = advanced_updated_info['analyst_rating']    
         
 def main():
     scraper = StockScraper()
