@@ -25,8 +25,8 @@ industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;
 '''Behold, the ugliest regex known to man! the reason why this is so unsightly is that if we want to extract the location of the company
 we in the html code need to look for the adress, ending with the country in question. But there are so many ways you can specify an adress, with umlaut,
 hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
-country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)((<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)|(<br\/>)([^<>]+)(<br\/>))"
-
+#country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)((<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)|(<br\/>)([^<>]+)(<br\/>))"
+country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+|<br\/>)([^<>]+|<br\/>)([^<>]+<br\/>|[^<>]+<br\/>)([^<>]+)"
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
 stock_rating_regex = "(<li\sclass=\"analyst__option\sactive\">)([a-zA-Z]+)(<\/li>)"
@@ -53,10 +53,12 @@ class StockScraper:
             from selenium.webdriver.support import expected_conditions as EC
             '''Ensure chromer driver is in path '''
             chromedriver_autoinstaller.install()
-            #chrome_options = Options()
-            #chrome_options.add_argument("--headless")
-            #self.web_driver = webdriver.Chrome(options=chrome_options)
-            self.web_driver = webdriver.Chrome()
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            '''Set it lowest log level, otherwise selenium VOMITS out redundant information'''
+            chrome_options.add_argument('log-level=3')
+            self.web_driver = webdriver.Chrome(options=chrome_options)
+           # self.web_driver = webdriver.Chrome()
             self.web_driver.maximize_window()
             self.element_waiter = WebDriverWait(self.web_driver , 10)
     def scraper_readin_config(self):
@@ -161,7 +163,7 @@ class StockScraper:
         extracted_country = re.search(country_regex, profile).groups()
 
         extracted_country = extracted_country[-2] if extracted_country[-2] != None else extracted_country[-5] 
-        
+
         stock_info["country"] = extracted_country
         stock_info["sector"] = extracted_sector
         stock_info["industry"] = extracted_industry
