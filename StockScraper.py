@@ -26,7 +26,8 @@ industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;
 we in the html code need to look for the adress, ending with the country in question. But there are so many ways you can specify an adress, with umlaut,
 hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
 #country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)((<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)|(<br\/>)([^<>]+)(<br\/>))"
-country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+|<br\/>)([^<>]+|<br\/>)([^<>]+<br\/>|[^<>]+<br\/>)([^<>]+)"
+#country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+|<br\/>)([^<>]+|<br\/>)([^<>]+<br\/>|[^<>]+<br\/>)([^<>]+)"
+country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)(.+)(<br/>)([a-zA-Z\s]+)(<br/>)"
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
 stock_rating_regex = "(<li\sclass=\"analyst__option\sactive\">)([a-zA-Z]+)(<\/li>)"
@@ -160,10 +161,10 @@ class StockScraper:
         extracted_sector = re.search(sector_regex, profile).group(2)
         extracted_industry = re.search(industry_regex, profile).group(2).replace("&amp;", "&")
         
-        extracted_country = re.search(country_regex, profile).groups()
+        #extracted_country = re.search(country_regex, profile).groups()
 
-        extracted_country = extracted_country[-2] if extracted_country[-2] != None else extracted_country[-5] 
-
+       # extracted_country = extracted_country[-2] if extracted_country[-2] != None else extracted_country[-5] 
+        extracted_country = re.search(country_regex, profile).group(4)
         stock_info["country"] = extracted_country
         stock_info["sector"] = extracted_sector
         stock_info["industry"] = extracted_industry
