@@ -160,22 +160,9 @@ Plotting from data:
 \begin{tikzpicture}[auto=left] 
 \node[circle] at (-3,-3) {Distribution of currencies in holdings};
 \node[circle] at (4,-3) {Distribution of nationality in holdings};
-\pie[
-radius=2,
-pos={-3,0}
-]{
-	22.97 / USD,
-    22.97/SEK,
-    8.11/SGD,
-    8.11/CNPY,
-    6.76/HKD,
-    31.07/EUR
-    }
+\pie[radius=2,pos={-3,0}]{22.97 / USD,22.97/SEK,8.11/SGD,8.11/CNPY,6.76/HKD,31.07/EUR}
     
-\pie[
-    radius=2,
-    pos={4,0},
-]{10/A, 20/B, 30/C, 40/D}
+\pie[radius=2,pos={4,0},]{10/A, 20/B, 30/C, 40/D}
 
 
 \end{tikzpicture}
