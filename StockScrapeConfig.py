@@ -26,7 +26,7 @@ class StockScrapeConfig:
         os.chdir("stockscraper_config")
         with open('config_info.json', 'w') as f:
             json.dump({"error_state": False, 'ref_currency':ref_currency.upper(), "row_id": None},f)
-        tickers = pd.DataFrame(columns = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country','analyst_rating', 'pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin'])
+        tickers = pd.DataFrame(columns = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'target_price','sector','industry', 'country','analyst_rating', 'pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin'])
         tickers.to_csv('items.csv',index=False)
         holding_value = pd.DataFrame(columns = ['holding_value'])
         holding_value.to_csv('returns.csv',index=False)
