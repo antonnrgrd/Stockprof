@@ -77,9 +77,6 @@ class StockProfiler:
         xtra_ticks = xtra_ticks + "{last_tick}".format(last_tick = len(returns) )
         xtra_ticks =  xtra_ticks + "}"
         y_tick_values = [round(math.ceil(min(returns["holding_value"])), -1),round(math.ceil(min(returns["holding_value"] * 1.1)), -1),round(math.ceil(min(returns["holding_value"] * 1.2)), -1),round(math.ceil(min(returns["holding_value"] * 1.3)), -1),round(math.ceil(min(returns["holding_value"] * 1.4)), -1),round(math.ceil(min(returns["holding_value"] * 1.5)), -1),round(math.ceil(min(returns["holding_value"] * 1.6)), -1),round(math.ceil(min(returns["holding_value"] * 1.7)), -1),round(math.ceil(min(returns["holding_value"] * 1.8)), -1)]
-       # latex_report.write("""ymin={minimum},
-       #                    """.format(minimum=min(returns["holding_value"])))
-       # latex_report.write("""ymax={maximum},""".format(maximum=max(returns["holding_value"])))
         y_ticks_as_str = "{"
         for y_tick in y_tick_values:
             y_ticks_as_str = y_ticks_as_str + f"{y_tick},"
