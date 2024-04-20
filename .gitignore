@@ -165,3 +165,6 @@ cython_debug/
 *.log
 *.aux
 *.synctex.gz
+
+#ignore any byproducts of the selenium library (the chrome brwoser stuff it downloads"
+google-chrome*
