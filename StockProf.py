@@ -7,20 +7,19 @@ import json
 import math
 from StockScraper import *
 import subprocess
+from sklearn.tree import export_graphviz
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 one_month_tickinfo_regex = "^07-|^14-|^21-|^01|^01-01"
 six_months_tickinfo_regex = "^14-|^01|^01-01"
 yearly_tickinfo_regex = "^01-|^01-01"
 five_years_tickinfo_regex = "^01-01-|^01-06"
 class StockProfiler:
-    def __init__(self):
+    def __init__(self, report_type):
+        self.userhome = os.path.expanduser('~') 
         self.scraper = StockScraper()
         counter = 1
-        present_date = datetime.datetime.now()
-        present_date = present_date.strftime("%d-%m-%Y")
-        self.title = f"Portfolio_report_dated_{present_date}"
+        self.title = self.profiler_derive_title(report_type)
         self.present_date = present_date
-        self.userhome = os.path.expanduser('~') 
         if os.path.exists("{}\\stockscraper_config\\{}.tex".format( self.userhome, self.title)):
             self.title = f"Portfolio_report_dated_{present_date}({counter})"
             while os.path.exists("{}\\stockscraper_config\\{}.tex".format(self.userhome, self.title)):
@@ -28,8 +27,24 @@ class StockProfiler:
                 self.title = f"Portfolio_report_dated_{present_date}({counter})"
         self.month_num_to_month_name_mapping = {"01": "Jan.", "02": "Feb.", "03": "March", "04": "April", "05": "May", "06": "June", "07": "July","08":"Aug.","09":"Sept.", "10":"Oct.", "11":"Nov.", "12": "Dec."}
         self.range_to_title_mapping = {"monthly":"{Returns on investment over a one month period}", "six_monthly":"{Returns on investment over a six-month period}","yearly": "{Returns on investment over a year}","five_yearly":"{Returns on investment over five years}"}
+        
+    def profiler_write_stock_prediction(self,latex_report,predicted_stock_rating, actual_stock_rating,decision_tree_forest):
+                        if predicted_stock_rating == actual_stock_rating:
+                            latex_report.write(f"The Stockanalyzer has given it a rating of {predicted_stock_rating}. This is is consistent with its actual current rating")
+                        else:
+                            latex_report.write(f"The Stockanalyzer has given it a rating of {predicted_stock_rating}. However, its current given rating is {actual_stock_rating}")
+                        
+                               
    
-          
+    def profiler_derive_title(self, report_type):
+        present_date = datetime.datetime.now()
+        present_date = present_date.strftime("%d-%m-%Y")
+        if report_type == "portfolio_report":
+            return f"Portfolio_report_dated_{present_date}"
+        elif report_type == "display_decision_tree_report":
+            return f"Random_forest_model_dated_{present_date}"
+        else:
+            raise Exception(f"Didn\'t recognnize argument {report_type} program only recognizes:portfolio,display_decision_tree")
     def profiler_write_axis_information(self, latex_report, returns, time_frame):
         ticks_as_str = "{"
         ticker_values = []
@@ -223,21 +238,21 @@ class StockProfiler:
         latex_report.write(""" 
                            }
                            """)
-    def profiler_write_preamble(self, latex_report):
+    def profiler_write_preamble(self, latex_report, report_title):
         latex_report.write(
-          """
-        \\documentclass{article}
-        \\usepackage{graphicx} % Required for inserting images
-        \\usepackage{tikz}
-        \\usepackage{multirow}
-        \\usetikzlibrary{positioning,arrows}
-        \\usetikzlibrary{arrows.meta}
-        \\title{Portfolio report}
-        \\usepackage{pgf-pie}  
-        \\usepackage{subcaption}
-        \\usetikzlibrary {datavisualization} 
-        \\usepackage{pgfplots}
-        \\date{Dated """ +  self.present_date + """ } """ 
+          f"""
+        \\documentclass{{article}}
+        \\usepackage{{graphicx}} % Required for inserting images
+        \\usepackage{{tikz}}
+        \\usepackage{{multirow}}
+        \\usetikzlibrary{{positioning,arrows}}
+        \\usetikzlibrary{{arrows.meta}}
+        \\title{report_title}
+        \\usepackage{{pgf-pie}}  
+        \\usepackage{{subcaption}}
+        \\usetikzlibrary {{datavisualization}} 
+        \\usepackage{{pgfplots}}
+        \\date{{Dated {self.present_date}}} """ 
         +
         
         """
@@ -417,15 +432,8 @@ class StockProfiler:
             self.scraper.scraper_get_currency_conv_factors(tickers)
             self.profiler_sanitize_ticker_data(tickers)
             tickers['returns'] = tickers.initial_price / tickers.current_price
-       #     biggest_return_p =  tickers.loc[tickers['returns'].idxmax()]
-       #     biggest_loss_return_p =  tickers.loc[tickers['returns'].idxmin()]
-            
-            
-
-            
-            userhome = os.path.expanduser('~') 
             with open("{}/stockscraper_config/{}.tex".format(userhome, self.title), 'w') as report:
-                self.profiler_write_preamble(report)
+                self.profiler_write_preamble(report, "Portfolio report")
                
                 self.profiler_write_performance_information(report)
                 self.profiler_write_weighting_information(report, tickers)
@@ -435,6 +443,10 @@ class StockProfiler:
                 self.profiler_write_ending(report)
             subprocess.run(["pdflatex", "--interaction=batchmode" , f"-output-directory={userhome}/stockscraper_config/", f"{userhome}/stockscraper_config/{self.title}"])
             print(f"You can find your report at {userhome}/stockscraper_config")
+    def profiler_generate_decision_tree_nodes_info(self, random_forest):
+        with open("{}/stockscraper_config/{}.tex".format(self.userhome, self.title), 'w') as report:
+            self.profiler_write_preamble(report, "Random forest model")
+        
 
 
                      

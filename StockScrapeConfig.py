@@ -6,8 +6,8 @@ import platform
 import pandas as pd
 import numpy as np
 from StockScraper import *
-import sys
 from StockProf import StockProfiler
+from StockAnalyzer import StockAnalyzer
 attr_index_mapping = {'ticker':0,'currency':1, 'current_price':2, 'initial_price':3, 'holding':4,'alert_threshold':5}
 class StockScrapeConfig:
     def setup_scraper_script(self):
@@ -23,6 +23,8 @@ class StockScrapeConfig:
         os.chdir(userhome)
         if not os.path.exists("stockscraper_config"):
             os.makedirs("stockscraper_config")
+            os.makedirs("stockscraper_config/random_forest_trees")
+            os.makedirs("stockscraper_config/random_forest_model")
         os.chdir("stockscraper_config")
         with open('config_info.json', 'w') as f:
             json.dump({"error_state": False, 'ref_currency':ref_currency.upper(), "row_id": None},f)
@@ -78,6 +80,7 @@ def main():
     parser.add_argument('--overwrite', action="store_true", default=False)
     parser.add_argument('--ref_currency', action="store", default=False)
     parser.add_argument('--advanced_webscrape',action="store_true")
+    parser.add_argument('--use_default_trainingset',action="store_true")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--update_items', action="store_true")
     group.add_argument('--additem', action="store_true")
@@ -85,6 +88,7 @@ def main():
     group.add_argument('--compute_returns',action="store_true")
     group.add_argument('--portfolio_report',action="store_true")
     group.add_argument('--generate_dummy_returns',action="store_true")
+    group.add_argument('--train_model',action="store_true")
     args = parser.parse_args()
 
 
@@ -117,8 +121,12 @@ def main():
         scraper = StockScraper(args.advanced_webscrape)
         scraper.scraper_generate_dummy_returns()
     elif args.portfolio_report:
-        profiler = StockProfiler()
+        profiler = StockProfiler("portfolio_report")
         profiler.profiler_generate_report_info()
+    elif args.train_model:
+        trainer = StockAnalyzer(use_portfolio_for_training=True)
+        trainer.stock_analyzer_train_model()
+    #elif args.
     
          
             

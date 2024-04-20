@@ -3,38 +3,43 @@ import json
 import os
 import pandas as pd
 import re
-from StockStatus import *
 import numpy as np
-from StockMailer import StockMailer
 import time
 import datetime
 import random
 import chromedriver_autoinstaller
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-currency_regex = "(Currency\sin\s)([A-Za-z]+)\s\([0-9,]+\.[0-9]+\s[A-Z]+\)|(Currency\sin\s)([A-Z]+)"
+import math
+from concurrent.futures import ThreadPoolExecutor
+currency_regex = "(Currency\sin\s)([A-Za-z()\.\s0-9]+)(</span>)"
 currency_subregex_first_case = "(Currency\sin\s)([A-Za-z]+)\s\([0-9,]+\.[0-9]+\s([A-Z]+)\)"
 currency_subregex_second_case = "(Currency\sin\s)([A-Z]+)"
 '''Regex for getting current price is suprisingly tricky to get correct. Lots of false positives, the commented-out ones
 were old candidates, saved just in case'''
-present_price_regex = "(FIN_TICKER_PRICE&quot;:&quot;)([0-9\.,]+)(&quot;)"
-dividend_yield_regex = "(\"DIVIDEND_AND_YIELD-value\">)(.+) \(([0-9]+\.[0-9]+%|N\/A)"
-one_year_target_price_regex = "(data-test=\"ONE_YEAR_TARGET_PRICE-value\">)([0-9,]+\.[0-9]+|N\/A)"
-sector_regex = "(Sector\(s\)<\/span>:\s<span class=\"Fw\(600\)\">)(([a-zA-Z]|\s)+)(<\/span>)"
-industry_regex = "(Industry<\/span>:\s<span\sclass=\"Fw\(600\)\">)([a-zA-Z\s—;&,\-]+)"
+#present_price_regex = "(FIN_TICKER_PRICE&quot;:&quot;)([0-9\.,]+)(&quot;)" (class=\"price\ssvelte-15b2o7n\">)([0-9\.]+)(</span>)
+present_price_regex = "(data-field=\"regularMarketPrice\")(.+)(data-value=\")([0-9\.]+)(\"+)"
+'''Note: this is a raw string as there are a ton of special characters, string delimiter mixing, escaping etc. And having it be a raw
+string was the only way to make python interpret it correctly '''
+dividend_yield_regex = r"(dividendYield\\\":{\\\"raw\\\":)([0-9\.]+)(,)"
+one_year_target_price_regex = "(targetMeanPrice\"\sclass=\"svelte-tx3nkj\">)([0-9\.,]+)"
+sector_regex = r"(sector\\\":\\\")([a-zA-Z&\s]+)"
+industry_regex = r"(industry\\\":\\\")([a-zA-Z&\s]+)"
 '''Behold, the ugliest regex known to man! the reason why this is so unsightly is that if we want to extract the location of the company
 we in the html code need to look for the adress, ending with the country in question. But there are so many ways you can specify an adress, with umlaut,
 hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
-#country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+)(<br\/>)([^<>]+)((<br\/>)([^<>]+)(<br\/>)([^<>]+)(<br\/>)|(<br\/>)([^<>]+)(<br\/>))"
-#country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)([^<>]+|<br\/>)([^<>]+|<br\/>)([^<>]+<br\/>|[^<>]+<br\/>)([^<>]+)"
-country_regex = "(class=\"D\(ib\)\sW\(47\.727%\)\sPend\(40px\)\">)(.+)(<br/>)([a-zA-Z\s]+)(<br/>)"
+country_regex = r"(country\\\":\\\")([a-zA-Z&\s]+)"
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 
-stock_rating_regex = "(<li\sclass=\"analyst__option\sactive\">)([a-zA-Z]+)(<\/li>)"
+#class=\"currency\ssvelte\-15b2o7n\"> <--- currency regex
 
 trailing_pe_element_index = 2
 peg_element_index = 4
 pb_element_index = 6
+
+#Yahoo finance seems to have upped their game a bit to circumvent webscraping, so the workaround is
+#adding this head info, curtesy to tsadigov from stackoverflow and reddit, that came with the workaround
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'}
 class StockScraper:
     def __init__(self,advanced_webscrape=False):
         self.conversion_factors = {}
@@ -59,7 +64,7 @@ class StockScraper:
             '''Set it lowest log level, otherwise selenium VOMITS out redundant information'''
             chrome_options.add_argument('log-level=3')
             self.web_driver = webdriver.Chrome(options=chrome_options)
-           # self.web_driver = webdriver.Chrome()
+            self.web_driver = webdriver.Chrome()
             self.web_driver.maximize_window()
             self.element_waiter = WebDriverWait(self.web_driver , 10)
     def scraper_readin_config(self):
@@ -98,7 +103,6 @@ class StockScraper:
         '''Okay so this is a bit of a headache, we read in with index 0 as the first column is the date column, i,e our index
         but in the edge case we have no value, the result is an empty df so we need to re-create it.'''
         returns = pd.read_csv("returns.csv",index_col=0)
-        #print(returns)
         if 'holding_value' not in returns.columns:
             returns = pd.DataFrame(columns = ['holding_value'])
         tickers["currency_amount"] = tickers["current_price"] * tickers["holding"]
@@ -129,8 +133,12 @@ class StockScraper:
     
     def scraper_all_item_info(self,ticker):
         stock_info = {}
-        summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'})
-        profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers={'User-Agent': 'Custom'})
+        summary = r.get(f"https://finance.yahoo.com/quote/{ticker}",headers=headers)
+        profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers=headers)
+        ''' To handle the special cases when a stock is listed in a subunit e.g cents, we have to look
+        at the chart info because after the update, the only place where they actually list the currency, is in the chart section
+        '''
+        chart = r.get(f"https://finance.yahoo.com/quote/{ticker}/chart?nn=1",headers=headers)
         if not summary.ok:
             failed_attempts = 0
             while not summary.ok and failed_attempts < 60:
@@ -146,25 +154,26 @@ class StockScraper:
         if not profile.ok or not summary.ok:
             print(profile.reason + str(profile.status_code))
             print(summary.reason + str(summary.status_code))
-        summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'}).text
-        profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers={'User-Agent': 'Custom'}).text
+        summary = summary.text
+        profile = profile.text
+        chart = chart.text
         '''Annoyingly, some currencies are listed in subunits e.g pennies and cents instead of pounds and dollars
         this regex counters this case'''
-        if "(" in re.search(currency_regex, summary).group(0):
-            extracted_currency = re.search(currency_subregex_first_case, re.search(currency_regex, summary).group(0)).group(3)
+        if "(" in re.search(currency_regex, chart).group(2):
+            extracted_currency = re.search(currency_subregex_first_case, re.search(currency_regex, chart).group(0)).group(3)
         else:        
-            extracted_currency = re.search(currency_subregex_second_case, summary).group(2)
-        extracted_price = re.search(present_price_regex, summary).group(2)
-        extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(3)
+            extracted_currency = re.search(currency_subregex_second_case, chart).group(2)
+        extracted_price = re.search(present_price_regex, summary).group(4)
+        extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(2)
         exracted_target_price = re.search(one_year_target_price_regex, summary).group(2)
         
         extracted_sector = re.search(sector_regex, profile).group(2)
-        extracted_industry = re.search(industry_regex, profile).group(2).replace("&amp;", "&")
+        extracted_industry = re.search(industry_regex, profile).group(2)
         
         #extracted_country = re.search(country_regex, profile).groups()
 
        # extracted_country = extracted_country[-2] if extracted_country[-2] != None else extracted_country[-5] 
-        extracted_country = re.search(country_regex, profile).group(4)
+        extracted_country = re.search(country_regex, profile).group(2)
         stock_info["country"] = extracted_country
         stock_info["sector"] = extracted_sector
         stock_info["industry"] = extracted_industry
@@ -215,8 +224,8 @@ class StockScraper:
                 self.scraper_advanced_get_statistics_info(tickers.at[ticker_index, "ticker"],advanced_ticker_info)
                 self.scraper_advanced_update_ticker_info(tickers,ticker_index,advanced_ticker_info)
         else:        
-                
             for ticker_index in tickers.index:
+                print(f"Scraping {tickers.at[ticker_index, 'ticker']}")
                 ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
                 self.scraper_update_ticker(tickers,ticker_info,ticker_index)
             '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
@@ -248,8 +257,8 @@ class StockScraper:
         down to the end of the page to make it visible'''
         self.web_driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
         analyst_rating = self.web_driver.find_element(By.CSS_SELECTOR,"""[data-test="rec-rating-txt"]""")
-        analyst_rating = float(analyst_rating.get_attribute("innerHTML"))
-        analyst_rating = self.scraper_map_num_rating_to_str_rating(analyst_rating)
+        analyst_rating = math.round(float(analyst_rating.get_attribute("innerHTML")))
+        #analyst_rating = self.scraper_map_num_rating_to_str_rating(analyst_rating)
         stock_info_dict['analyst_rating'] = analyst_rating
     def scraper_advanced_get_statistics_info(self,ticker,stock_info_dict):
         self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}")          
@@ -257,28 +266,12 @@ class StockScraper:
         stock_info_dict["pb_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[pb_element_index].text  
         stock_info_dict["pe_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[trailing_pe_element_index].text
         stock_info_dict["peg_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[peg_element_index].text
-    def scraper_map_float_to_int(self, rating):
-        if rating <=2:
-            return 1
-        elif rating <=3:
-            return 2
-        elif rating <=4:
-            return 3
-        elif rating <=5:
-            return 4
-        else:
-            return 5
-    def scraper_map_num_rating_to_str_rating(self, rating):
-        if rating <=2:
-            return ("Strong buy", rating)
-        elif rating <=3:
-            return ("Buy", rating)
-        elif rating <=4:
-            return ("Hold", rating)
-        elif rating <=5:
-            return ("Underperform", rating)
-        else:
-            return ("Sell", rating)    
+    
+   # def scraper_scrape_training_dataset(self):
+    #    sectors = ['']
+    #    for sector in sectors:
+            
+    
     def scraper_advanced_update_ticker_info(self, tickers_df,index,advanced_updated_info):
         tickers_df.at[index,'pb_ratio'] = advanced_updated_info['pb_ratio']
         tickers_df.at[index,'pe_ratio'] = advanced_updated_info['pe_ratio']
