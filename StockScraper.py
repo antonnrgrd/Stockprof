@@ -249,9 +249,6 @@ class StockScraper:
         '''Assumes URL is formatted version of "Analysis" section to work '''
     def scraper_get_stock_rating(self,ticker,stock_info_dict):
         self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}")
-        '''Wait until the dynamic elements have loaded. This sufficiently achieved
-        by waiting for the recommended tickers to appear'''
-        self.element_waiter.until(EC.presence_of_element_located((By.ID, "recommendations-by-symbol")))
         '''Quite annoyingly, the selenium webdriver is not competent to find web elements
         if the element in question is not physically visible on screen as seen from the view of an end user. So we scroll
         down to the end of the page to make it visible'''
