@@ -30,7 +30,7 @@ we in the html code need to look for the adress, ending with the country in ques
 hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
 country_regex = r"(country\\\":\\\")([a-zA-Z&\s]+)"
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
-
+analyst_rating_regex = "(analysis\sshows\sthe\s)([a-z|\s]+)(\stoday)"
 #class=\"currency\ssvelte\-15b2o7n\"> <--- currency regex
 
 trailing_pe_element_index = 2
@@ -164,7 +164,10 @@ class StockScraper:
         else:        
             extracted_currency = re.search(currency_subregex_second_case, chart).group(2)
         extracted_price = re.search(present_price_regex, summary).group(4)
-        extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(2)
+        if re.search(dividend_yield_regex, summary):
+            extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(2)
+        else:
+            extracted_dividend_yield = np.NaN
         exracted_target_price = re.search(one_year_target_price_regex, summary).group(2)
         
         extracted_sector = re.search(sector_regex, profile).group(2)
@@ -248,15 +251,9 @@ class StockScraper:
         button.click()
         '''Assumes URL is formatted version of "Analysis" section to work '''
     def scraper_get_stock_rating(self,ticker,stock_info_dict):
-        self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}")
-        '''Quite annoyingly, the selenium webdriver is not competent to find web elements
-        if the element in question is not physically visible on screen as seen from the view of an end user. So we scroll
-        down to the end of the page to make it visible'''
-        self.web_driver.execute_script("window.scrollTo(0, document.body.scrollHeight)")
-        analyst_rating = self.web_driver.find_element(By.CSS_SELECTOR,"""[data-test="rec-rating-txt"]""")
-        analyst_rating = math.round(float(analyst_rating.get_attribute("innerHTML")))
-        #analyst_rating = self.scraper_map_num_rating_to_str_rating(analyst_rating)
-        stock_info_dict['analyst_rating'] = analyst_rating
+        ticker = ticker.split(".", 1)[0]
+        ticker_info = r.get(f"https://www.tradingview.com/symbols/{ticker}/", headers=headers).text
+        stock_info_dict["analyst_rating"] = re.search(analyst_rating_regex,ticker_info).group(2)
     def scraper_advanced_get_statistics_info(self,ticker,stock_info_dict):
         self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}")          
 

@@ -15,16 +15,10 @@ yearly_tickinfo_regex = "^01-|^01-01"
 five_years_tickinfo_regex = "^01-01-|^01-06"
 class StockProfiler:
     def __init__(self, report_type):
+        self.present_date = None
         self.userhome = os.path.expanduser('~') 
         self.scraper = StockScraper()
-        counter = 1
-        self.title = self.profiler_derive_title(report_type)
-        self.present_date = present_date
-        if os.path.exists("{}\\stockscraper_config\\{}.tex".format( self.userhome, self.title)):
-            self.title = f"Portfolio_report_dated_{present_date}({counter})"
-            while os.path.exists("{}\\stockscraper_config\\{}.tex".format(self.userhome, self.title)):
-                counter = counter + 1
-                self.title = f"Portfolio_report_dated_{present_date}({counter})"
+        self.title = self.profiler_derive_title(report_type)       
         self.month_num_to_month_name_mapping = {"01": "Jan.", "02": "Feb.", "03": "March", "04": "April", "05": "May", "06": "June", "07": "July","08":"Aug.","09":"Sept.", "10":"Oct.", "11":"Nov.", "12": "Dec."}
         self.range_to_title_mapping = {"monthly":"{Returns on investment over a one month period}", "six_monthly":"{Returns on investment over a six-month period}","yearly": "{Returns on investment over a year}","five_yearly":"{Returns on investment over five years}"}
         
@@ -37,6 +31,7 @@ class StockProfiler:
                                
    
     def profiler_derive_title(self, report_type):
+        counter = 1
         present_date = datetime.datetime.now()
         present_date = present_date.strftime("%d-%m-%Y")
         if report_type == "portfolio_report":
@@ -45,6 +40,11 @@ class StockProfiler:
             return f"Random_forest_model_dated_{present_date}"
         else:
             raise Exception(f"Didn\'t recognnize argument {report_type} program only recognizes:portfolio,display_decision_tree")
+        if os.path.exists("{}\\stockscraper_config\\{}.tex".format( self.userhome, self.title)):
+            self.title = f"Portfolio_report_dated_{present_date}({counter})"
+            while os.path.exists("{}\\stockscraper_config\\{}.tex".format(self.userhome, self.title)):
+                counter = counter + 1
+                self.title = f"Portfolio_report_dated_{present_date}({counter})"
     def profiler_write_axis_information(self, latex_report, returns, time_frame):
         ticks_as_str = "{"
         ticker_values = []
