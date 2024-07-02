@@ -28,8 +28,8 @@ hyphen, punction, whitespace etc. so you need to be super general with what you 
 country_regex = r"(country\\\":\\\")([a-zA-Z&\s]+)"
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 analyst_rating_regex = "(analysis\sshows\sthe\s)([a-z|\s]+)(\stoday)"
-pb_ratio_regex="(priceToBook.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
-pe_ratio_regex="(trailingPE.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
+pb_ratio_regex=r"(priceToBook.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
+pe_ratio_regex=r"(trailingPE.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
 peg_ratio_regex = "(PEG Ratio\s(\s5yr expected\s)\s\s</p>\s<p class=\"value svelte-1n4vnw8\">)"
 
 #Yahoo finance seems to have upped their game a bit to circumvent webscraping, so the workaround is
@@ -158,7 +158,8 @@ class StockScraper:
         stock_info["target_price"] = float(exracted_target_price.replace(",", "")) if exracted_target_price != "N/A" else np.NaN
         stock_info["dividend_yield"] = extracted_dividend_yield if extracted_dividend_yield != "N/A" else np.NaN
         stock_info["pb_ratio"] = re.search(pb_ratio_regex, summary).group(3)
-        stock_info["pe_ratio"] = re.search(pe_ratio_regex, summary).group(3)
+        pe_ratio_search = re.search(pe_ratio_regex, summary)
+        stock_info["pe_ratio"] = pe_ratio_search.group(3) if pe_ratio_search != None else np.NaN
         return stock_info
     
     '''Large values are represented in shorthand with B for billion and M for million.
