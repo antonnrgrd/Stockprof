@@ -7,9 +7,6 @@ import numpy as np
 import time
 import datetime
 import random
-import chromedriver_autoinstaller
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
 import math
 from concurrent.futures import ThreadPoolExecutor
 currency_regex = "(Currency\sin\s)([A-Za-z()\.\s0-9]+)(</span>)"
@@ -31,42 +28,18 @@ hyphen, punction, whitespace etc. so you need to be super general with what you 
 country_regex = r"(country\\\":\\\")([a-zA-Z&\s]+)"
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 analyst_rating_regex = "(analysis\sshows\sthe\s)([a-z|\s]+)(\stoday)"
-#class=\"currency\ssvelte\-15b2o7n\"> <--- currency regex
-
-trailing_pe_element_index = 2
-peg_element_index = 4
-pb_element_index = 6
+pb_ratio_regex="(priceToBook.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
+pe_ratio_regex="(trailingPE.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
+peg_ratio_regex = "(PEG Ratio\s(\s5yr expected\s)\s\s</p>\s<p class=\"value svelte-1n4vnw8\">)"
 
 #Yahoo finance seems to have upped their game a bit to circumvent webscraping, so the workaround is
 #adding this head info, curtesy to tsadigov from stackoverflow and reddit, that came with the workaround
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'}
 class StockScraper:
-    def __init__(self,advanced_webscrape=False):
+    def __init__(self):
         self.conversion_factors = {}
         self.reference_currency = None
         self.scraper_readin_config()
-        self.web_driver = None
-        self.element_waiter = None
-        self.advanced_webscrape = False
-        '''Selenium adds a lot of "weight" to program. So we will only import it if we
-        need to webscrape dynamic elements from Yahoo'''
-        if advanced_webscrape:
-            self.advanced_webscrape = True
-            from selenium.webdriver.chrome.options import Options
-            from selenium import webdriver
-            from selenium.webdriver.common.by import By
-            from selenium.webdriver.support.ui import WebDriverWait
-            from selenium.webdriver.support import expected_conditions as EC
-            '''Ensure chromer driver is in path '''
-            chromedriver_autoinstaller.install()
-            chrome_options = Options()
-            chrome_options.add_argument("--headless")
-            '''Set it lowest log level, otherwise selenium VOMITS out redundant information'''
-            chrome_options.add_argument('log-level=3')
-            self.web_driver = webdriver.Chrome(options=chrome_options)
-            self.web_driver = webdriver.Chrome()
-            self.web_driver.maximize_window()
-            self.element_waiter = WebDriverWait(self.web_driver , 10)
     def scraper_readin_config(self):
         userhome = os.path.expanduser('~')
         with open(f"{userhome}/stockscraper_config/config_info.json") as f:
@@ -184,6 +157,8 @@ class StockScraper:
         stock_info["current_price"] = float(extracted_price.replace(",", "")) if extracted_price != "N/A" else np.NaN
         stock_info["target_price"] = float(exracted_target_price.replace(",", "")) if exracted_target_price != "N/A" else np.NaN
         stock_info["dividend_yield"] = extracted_dividend_yield if extracted_dividend_yield != "N/A" else np.NaN
+        stock_info["pb_ratio"] = re.search(pb_ratio_regex, summary).group(3)
+        stock_info["pe_ratio"] = re.search(pe_ratio_regex, summary).group(3)
         return stock_info
     
     '''Large values are represented in shorthand with B for billion and M for million.
@@ -206,64 +181,34 @@ class StockScraper:
         df.at[index,'target_price']=updated_info["target_price"]
         df.at[index,'current_price']= updated_info["current_price"] if updated_info["current_price"] != "N/A" else np.NaN
         df.at[index,'target_price']= updated_info["target_price"]
-    
-    def scraper_update_ticker_advanced(self,df,updated_info,index): 
-        df.at[index,'analyst_rating']=updated_info["analyst_rating"]
         df.at[index,'pb_ratio']=updated_info["pb_ratio"]
         df.at[index,'pe_ratio']=updated_info["pe_ratio"]
+    def scraper_update_ticker_advanced(self,df,updated_info,index): 
+        df.at[index,'analyst_rating']=updated_info["analyst_rating"]
+
+
         df.at[index,'peg_ratio']=updated_info["peg_ratio"]
     def scraper_update_ticker_info(self):
         userhome = os.path.expanduser('~')          
         os.chdir("{home}/stockscraper_config".format(home=userhome))
         tickers = pd.read_csv("items.csv")
-        if self.advanced_webscrape:
-            self.scraper_advanced_get_past_cookie_section()
-            for ticker_index in tickers.index:
-                print(f"Scraping {tickers.at[ticker_index, 'ticker']}")
-                ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
-                self.scraper_update_ticker(tickers,ticker_info,ticker_index)
-                advanced_ticker_info = {}
-                self.scraper_get_stock_rating(tickers.at[ticker_index, "ticker"],advanced_ticker_info)
-                self.scraper_advanced_get_statistics_info(tickers.at[ticker_index, "ticker"],advanced_ticker_info)
-                self.scraper_advanced_update_ticker_info(tickers,ticker_index,advanced_ticker_info)
-        else:        
-            for ticker_index in tickers.index:
-                print(f"Scraping {tickers.at[ticker_index, 'ticker']}")
-                ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
-                self.scraper_update_ticker(tickers,ticker_info,ticker_index)
+        
+              
+        for ticker_index in tickers.index:
+            print(f"Scraping {tickers.at[ticker_index, 'ticker']}")
+            ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
+            self.scraper_update_ticker(tickers,ticker_info,ticker_index)
             '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
             we would for each iteration append a coulumn to the df when writing it out'''
         tickers.to_csv("items.csv",index=False)
         print("Completed webscrape successfully")
-        '''When first "visiting" the site during the webscrape, the cookie
-        consent popup will appear. We have to deal with this first before
-        the scraping can commence'''
-    def scraper_advanced_get_past_cookie_section(self):
-        self.web_driver.get("https://finance.yahoo.com")
-        '''Handle the cookie consent popup that appears.
-        Find the button you want to click. This is done by finding an element with the name
-        reject'''
-        button = self.web_driver.find_element(By.NAME,'reject')
-        '''Click the button - by first scrolling down and then clicking. Sidenote - the amount 
-        required to scroll was a bit of a shot in the dark. This might not work for sufficiently
-        big enough screens maybe?'''
-        self.web_driver.execute_script("window.scrollTo(0, 200)")
-        button.click()
-        '''Assumes URL is formatted version of "Analysis" section to work '''
+
+
     def scraper_get_stock_rating(self,ticker,stock_info_dict):
         ticker = ticker.split(".", 1)[0]
         ticker_info = r.get(f"https://www.tradingview.com/symbols/{ticker}/", headers=headers).text
         stock_info_dict["analyst_rating"] = re.search(analyst_rating_regex,ticker_info).group(2)
-    def scraper_advanced_get_statistics_info(self,ticker,stock_info_dict):
-        self.web_driver.get(f"https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}")          
-
-        stock_info_dict["pb_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[pb_element_index].text  
-        stock_info_dict["pe_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[trailing_pe_element_index].text
-        stock_info_dict["peg_ratio"] = self.web_driver.find_elements(By.XPATH,"""//td[@class="Fw(500) Ta(end) Pstart(10px) Miw(60px)"]""")[peg_element_index].text
-    
-   # def scraper_scrape_training_dataset(self):
-    #    sectors = ['']
-    #    for sector in sectors:
+   
             
     
     def scraper_advanced_update_ticker_info(self, tickers_df,index,advanced_updated_info):

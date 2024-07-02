@@ -112,13 +112,13 @@ def main():
         a StockerScraper object involves reading in a users config, which would fail if they had not
         already run a config setup.'''
     elif args.update_items:
-        scraper = StockScraper(args.advanced_webscrape)
+        scraper = StockScraper()
         scraper.scraper_update_ticker_info()
     elif args.compute_returns:
-        scraper = StockScraper(args.advanced_webscrape)
+        scraper = StockScraper()
         scraper.scraper_get_daily_returns()
     elif args.generate_dummy_returns:
-        scraper = StockScraper(args.advanced_webscrape)
+        scraper = StockScraper()
         scraper.scraper_generate_dummy_returns()
     elif args.portfolio_report:
         profiler = StockProfiler("portfolio_report")
