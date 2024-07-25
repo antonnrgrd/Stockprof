@@ -19,7 +19,7 @@ present_price_regex = "(data-field=\"regularMarketPrice\")(.+)(data-value=\")([0
 '''Note: this is a raw string as there are a ton of special characters, string delimiter mixing, escaping etc. And having it be a raw
 string was the only way to make python interpret it correctly '''
 dividend_yield_regex = r"(dividendYield\\\":{\\\"raw\\\":)([0-9\.]+)(,)"
-one_year_target_price_regex = "(targetMeanPrice\"\sclass=\"svelte-tx3nkj\">)([0-9\.,]+)"
+one_year_target_price_regex = r"(targetMeanPrice.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
 sector_regex = r"(sector\\\":\\\")([a-zA-Z&\s]+)"
 industry_regex = r"(industry\\\":\\\")([a-zA-Z&\s]+)"
 '''Behold, the ugliest regex known to man! the reason why this is so unsightly is that if we want to extract the location of the company
@@ -100,9 +100,6 @@ class StockScraper:
         when converting the currencies to the reference currency'''
         self.conversion_factors[self.reference_currency] = 1
     
-    def scraper_scrape_all_ticker_info_advanced(self, ticker,stock_info):
-        stock_info['analyst_rating'] = self.scraper_get_stock_rating(ticker,stock_info)
-        self.scraper_advanced_get_statistics_info(ticker, stock_info)
     
     def scraper_all_item_info(self,ticker):
         stock_info = {}
@@ -141,7 +138,7 @@ class StockScraper:
             extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(2)
         else:
             extracted_dividend_yield = np.NaN
-        exracted_target_price = re.search(one_year_target_price_regex, summary).group(2)
+        exracted_target_price = re.search(one_year_target_price_regex, summary).group(3)
         
         extracted_sector = re.search(sector_regex, profile).group(2)
         extracted_industry = re.search(industry_regex, profile).group(2)
@@ -160,6 +157,7 @@ class StockScraper:
         stock_info["pb_ratio"] = re.search(pb_ratio_regex, summary).group(3)
         pe_ratio_search = re.search(pe_ratio_regex, summary)
         stock_info["pe_ratio"] = pe_ratio_search.group(3) if pe_ratio_search != None else np.NaN
+        stock_info["analyst_rating"] = self.scraper_get_stock_rating(ticker)
         return stock_info
     
     '''Large values are represented in shorthand with B for billion and M for million.
@@ -184,15 +182,9 @@ class StockScraper:
         df.at[index,'target_price']= updated_info["target_price"]
         df.at[index,'pb_ratio']=updated_info["pb_ratio"]
         df.at[index,'pe_ratio']=updated_info["pe_ratio"]
-    def scraper_update_ticker_advanced(self,df,updated_info,index): 
         df.at[index,'analyst_rating']=updated_info["analyst_rating"]
-
-
-        df.at[index,'peg_ratio']=updated_info["peg_ratio"]
-    def scraper_update_ticker_info(self):
-        userhome = os.path.expanduser('~')          
-        os.chdir("{home}/stockscraper_config".format(home=userhome))
-        tickers = pd.read_csv("items.csv")
+    def scraper_update_ticker_info(self,path):
+        tickers = pd.read_csv(path)
         
               
         for ticker_index in tickers.index:
@@ -201,14 +193,14 @@ class StockScraper:
             self.scraper_update_ticker(tickers,ticker_info,ticker_index)
             '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
             we would for each iteration append a coulumn to the df when writing it out'''
-        tickers.to_csv("items.csv",index=False)
+        tickers.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv",index=False)
         print("Completed webscrape successfully")
 
 
-    def scraper_get_stock_rating(self,ticker,stock_info_dict):
-        ticker = ticker.split(".", 1)[0]
+    def scraper_get_stock_rating(self,ticker):
+        ticker = ticker.split(".", 1)[0].replace("-", "_")
         ticker_info = r.get(f"https://www.tradingview.com/symbols/{ticker}/", headers=headers).text
-        stock_info_dict["analyst_rating"] = re.search(analyst_rating_regex,ticker_info).group(2)
+        return re.search(analyst_rating_regex,ticker_info).group(2)
    
             
     

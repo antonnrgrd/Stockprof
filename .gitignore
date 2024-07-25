@@ -168,3 +168,6 @@ cython_debug/
 
 #ignore any byproducts of the selenium library (the chrome brwoser stuff it downloads"
 google-chrome*
+
+#Ignore CSV files
+*.csv

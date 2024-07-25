@@ -81,6 +81,7 @@ def main():
     parser.add_argument('--ref_currency', action="store", default=False)
     parser.add_argument('--advanced_webscrape',action="store_true")
     parser.add_argument('--use_default_trainingset',action="store_true")
+    parser.add_argument('--target_stock',action="store_true")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--update_items', action="store_true")
     group.add_argument('--additem', action="store_true")
@@ -88,7 +89,9 @@ def main():
     group.add_argument('--compute_returns',action="store_true")
     group.add_argument('--portfolio_report',action="store_true")
     group.add_argument('--generate_dummy_returns',action="store_true")
+    group.add_argument('--encode_training_data',action="store_true")
     group.add_argument('--train_model',action="store_true")
+    group.add_argument('--get_stock_prediction',action="store_true")
     args = parser.parse_args()
 
 
@@ -113,7 +116,7 @@ def main():
         already run a config setup.'''
     elif args.update_items:
         scraper = StockScraper()
-        scraper.scraper_update_ticker_info()
+        scraper.scraper_update_ticker_info(f"{os.path.expanduser('~')}/stockscraper_config/items.csv")
     elif args.compute_returns:
         scraper = StockScraper()
         scraper.scraper_get_daily_returns()
@@ -126,7 +129,12 @@ def main():
     elif args.train_model:
         trainer = StockAnalyzer(use_portfolio_for_training=True)
         trainer.stock_analyzer_train_model()
-    #elif args.
+    elif args.encode_training_data:
+        trainer = StockAnalyzer(use_portfolio_for_training=True)
+        trainer.stock_analyzer_encode_training_data()
+    elif args.train_model:
+        trainer = StockAnalyzer(use_portfolio_for_training=True)
+        trainer.stock_analyzer_train_model()
     
          
             

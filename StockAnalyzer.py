@@ -7,13 +7,13 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import make_classification
 from StockScraper import StockScraper
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import OneHotEncoder
 import os
 import pickle
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
+from sklearn import preprocessing
 class StockAnalyzer:
     def __init__(self, autotrain_model=False,use_portfolio_for_training=False):
-        self.enc = OneHotEncoder(handle_unknown='error')
         self.use_portfolio_for_training = use_portfolio_for_training
         self.training_data = None
         self.userhome = os.path.expanduser('~') 
@@ -24,41 +24,22 @@ class StockAnalyzer:
             self.random_forest = self.stock_analyzer_train_model(None)
         else:
             self.random_forest = None
-        self.scraper = StockScraper(advanced_webscrape=True)
-    def stok_analyzer_onehot_code_data(self,dataset):
-        if isinstance(dataset, pd.DataFrame):
-            for column in dataset.columns:
-                '''One could probably construct counterexamples where this logic is not sufficient
-                but for this particular instance, it is'''
-                if dataset[column].dtype != np.number:
-                    dataset[column] = self.enc.fit_transform(dataset[column])
-                ''' If not a pandas dataframe, blindly assume it must be a list of lists'''
-        else:
-            for index, value in dataset:
-                if isinstance(value, str):
-                    pass #dataset[ =  self.enc.fit_transform(dataset[column])
-        return dataset
+        self.scraper = StockScraper()
     def stock_analyzer_train_model(self):
-        if self.use_portfolio_for_training:
-            '''Read in the subset of columns that we will be using for training data, in said order'''
-            self.training_data = pd.read_csv(f"{self.userhome}/stockscraper_config/items.csv", usecols=['currency', 'current_price','target_price', 'sector', 'industry','country','analyst_rating','pb_ratio','pe_ratio', 'peg_ratio','ev_ebitda_ratio', 'market_cap_in_ref_currency', 'profit_margin'])[['currency', 'current_price','target_price', 'sector', 'industry','country','analyst_rating','pb_ratio','pe_ratio', 'peg_ratio','ev_ebitda_ratio', 'market_cap_in_ref_currency', 'profit_margin']]
-        else:
-            pass
-        training_data = self.training_data.loc[:, self.training_data.columns != "analyst_rating"]
-        analyst_ratings = self.training_data.loc[:, self.training_data.columns == "analyst_rating"]
-        training_data = self.enc.fit_transform(training_data)
-        clf = RandomForestClassifier(n_estimators=10)
-        clf = clf.fit(training_data, analyst_ratings)
-        for index_of_tree, iterated_tree in enumerate(self.random_forest):
-            fig, axes = plt.subplots(nrows = 1,ncols = 1,figsize = (4,4), dpi=800)
-            tree.plot_tree(iterated_tree,
-                           feature_names = training_data.columns, 
-                           class_names=["Strong buy","Buy","Hold","Underperform","Sell"],
-                           filled = True)
-            fig.savefig(f'{self.user_home}/stockscraper_config/random_forest_treesforest_tree_{index_of_tree}.png')
-        with open('path/to/file', 'wb') as model:
-            pickle.dump(clf, model)
-        return clf
+        training_data = None
+        training_data_labels = None
+        try:
+            training_data = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data.csv")
+            training_data_labels = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data_labels.csv")
+        except:
+            print("yo mama")
+        random_forest = RandomForestClassifier()
+        random_forest.fit(training_data, training_data_labels)
+        with open(f"{os.path.expanduser('~')}/stockscraper_config/best_model.pkl", 'wb') as f:  # open a text file
+            pickle.dump(random_forest, f) 
+                
+       
+       
     def stock_analyzer_map_num_rating_to_str_rating(self, rating):
         if rating <=2:
             "Strong buy"
@@ -70,6 +51,7 @@ class StockAnalyzer:
             "Underperform"
         else:
             "Sell"  
+            
     def stock_analyzer_predict(self,ticker):
         return  self.stock_analyser_map_num_rating_to_str_rating(self.decision_tree.predict(ticker))
     '''While the stocks have a discrete rating e.g Strong buy, buy, hold etc.
@@ -99,3 +81,20 @@ class StockAnalyzer:
         ticker_information = ticker_information.pop('analyst_rating', None).values
         predicted_ticker_rating =  self.random_forest.predict(ticker_information)
         
+    def stock_analyzer_encode_columns_to_numerical(self,df):
+        for column in df.columns:
+            if not is_numeric_dtype(df[column]):
+                one_hot = pd.get_dummies(df[column])
+                df = df.drop(column,axis = 1)
+                df = pd.concat([df, one_hot], axis=1)
+        return df
+    def stock_analyzer_encode_training_data(self):
+        stock_data = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv")
+        stock_data = stock_data.drop_duplicates(subset=['ticker'])
+        analyst_rating_labels = stock_data[["analyst_rating"]].copy()
+        stock_data.drop("analyst_rating", axis=1)
+        stock_data_encoded = self.stock_analyzer_encode_columns_to_numerical(stock_data)
+        le = preprocessing.LabelEncoder()
+        analyst_rating_labels['analyst_rating'] = le.fit_transform(analyst_rating_labels['analyst_rating'] )
+        stock_data_encoded.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data.csv")
+        analyst_rating_labels.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data_labels.csv")
