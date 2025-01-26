@@ -9,13 +9,14 @@ import datetime
 import random
 import math
 from concurrent.futures import ThreadPoolExecutor
-currency_regex = "(Currency\sin\s)([A-Za-z()\.\s0-9]+)(</span>)"
+from bs4 import BeautifulSoup
+currency_regex = r"(currencyCode\\\":\\\")([A-Za-z]+)"
 currency_subregex_first_case = "(Currency\sin\s)([A-Za-z]+)\s\([0-9,]+\.[0-9]+\s([A-Z]+)\)"
 currency_subregex_second_case = "(Currency\sin\s)([A-Z]+)"
 '''Regex for getting current price is suprisingly tricky to get correct. Lots of false positives, the commented-out ones
 were old candidates, saved just in case'''
 #present_price_regex = "(FIN_TICKER_PRICE&quot;:&quot;)([0-9\.,]+)(&quot;)" (class=\"price\ssvelte-15b2o7n\">)([0-9\.]+)(</span>)
-present_price_regex = "(data-field=\"regularMarketPrice\")(.+)(data-value=\")([0-9\.]+)(\"+)"
+present_price_regex = r'(\\"regularMarketPrice\\":{\\"raw\\":[0-9\.]+,\\"fmt\\":\\")([0-9,\.]+)'
 '''Note: this is a raw string as there are a ton of special characters, string delimiter mixing, escaping etc. And having it be a raw
 string was the only way to make python interpret it correctly '''
 dividend_yield_regex = r"(dividendYield\\\":{\\\"raw\\\":)([0-9\.]+)(,)"
@@ -28,9 +29,9 @@ hyphen, punction, whitespace etc. so you need to be super general with what you 
 country_regex = r"(country\\\":\\\")([a-zA-Z&\s]+)"
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 analyst_rating_regex = "(analysis\sshows\sthe\s)([a-z|\s]+)(\stoday)"
-pb_ratio_regex=r"(priceToBook.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
-pe_ratio_regex=r"(trailingPE.+)(\\\"fmt\\\":\\\")([0-9\.]+)"
-peg_ratio_regex = "(PEG Ratio\s(\s5yr expected\s)\s\s</p>\s<p class=\"value svelte-1n4vnw8\">)"
+pb_ratio_regex=r"(Price\/Book<\/td>\s<td\sclass=\"yf-kbx2lo\">)([0-9\.,]+)"
+trailing_pe_ratio_regex=r"(\"trailingPE\"\sclass=\"yf-wk1sm9\">)([0-9\.]+)"
+five_year_expected_peg_ratio_regex = r"(PEG\sRatio\s\(5yr\sexpected\)</td>\s<td\sclass=\"yf-kbx2lo\">)([0-9\.,]+)"
 
 #Yahoo finance seems to have upped their game a bit to circumvent webscraping, so the workaround is
 #adding this head info, curtesy to tsadigov from stackoverflow and reddit, that came with the workaround
@@ -100,107 +101,82 @@ class StockScraper:
         when converting the currencies to the reference currency'''
         self.conversion_factors[self.reference_currency] = 1
     
-    
-    def scraper_all_item_info(self,ticker):
+    def scraper_get_web_page(self,url:str)  -> r.Response:  
+        web_page_response = r.get(url, headers=headers)
+        if not web_page_response.ok:
+            num_attempts_to_get_page = 0
+            while not web_page_response.ok and num_attempts_to_get_page < 10:
+                web_page_response = r.get(url, headers=headers)
+                num_attempts_to_get_page = num_attempts_to_get_page + 1 
+                time.sleep(num_attempts_to_get_page)
+            if not web_page_response.ok:
+                raise Exception(f"Couldn\'t scrape {url}, got {web_page_response.status_code} ")
+        return web_page_response
+        
+    def scraper_extract_web_info_to_dict(self, **web_pages):
         stock_info = {}
-        summary = r.get(f"https://finance.yahoo.com/quote/{ticker}",headers=headers)
-        profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers=headers)
-        ''' To handle the special cases when a stock is listed in a subunit e.g cents, we have to look
-        at the chart info because after the update, the only place where they actually list the currency, is in the chart section
-        '''
-        chart = r.get(f"https://finance.yahoo.com/quote/{ticker}/chart?nn=1",headers=headers)
-        if not summary.ok:
-            failed_attempts = 0
-            while not summary.ok and failed_attempts < 60:
-                summary = r.get(f"https://finance.yahoo.com/quote/{ticker}?p={ticker}",headers={'User-Agent': 'Custom'})
-                failed_attempts = failed_attempts + 1
-                time.sleep(failed_attempts)
-        if not profile.ok:
-            failed_attempts = 0
-            while not summary.ok and failed_attempts < 60:
-                profile = r.get(f"https://finance.yahoo.com/quote/{ticker}/profile?p={ticker}",headers={'User-Agent': 'Custom'})
-                failed_attempts = failed_attempts + 1 
-                time.sleep(failed_attempts)
-        if not profile.ok or not summary.ok:
-            print(profile.reason + str(profile.status_code))
-            print(summary.reason + str(summary.status_code))
-        summary = summary.text
-        profile = profile.text
-        chart = chart.text
         '''Annoyingly, some currencies are listed in subunits e.g pennies and cents instead of pounds and dollars
         this regex counters this case'''
-        if "(" in re.search(currency_regex, chart).group(2):
-            extracted_currency = re.search(currency_subregex_first_case, re.search(currency_regex, chart).group(0)).group(3)
-        else:        
-            extracted_currency = re.search(currency_subregex_second_case, chart).group(2)
-        extracted_price = re.search(present_price_regex, summary).group(4)
-        if re.search(dividend_yield_regex, summary):
-            extracted_dividend_yield = re.search(dividend_yield_regex, summary).group(2)
+
+        extracted_currency = re.search(currency_regex, web_pages["stock_summary_as_text"]).group(2)
+
+        extracted_price = re.search(present_price_regex, web_pages["stock_summary_as_text"]).group(2)
+        if re.search(dividend_yield_regex, web_pages["stock_summary_as_text"]):
+            extracted_dividend_yield = re.search(dividend_yield_regex, web_pages["stock_summary_as_text"]).group(2)
         else:
             extracted_dividend_yield = np.NaN
-        exracted_target_price = re.search(one_year_target_price_regex, summary).group(3)
+        exracted_target_price = re.search(one_year_target_price_regex, web_pages["stock_summary_as_text"]).group(3)
         
-        extracted_sector = re.search(sector_regex, profile).group(2)
-        extracted_industry = re.search(industry_regex, profile).group(2)
+        extracted_sector = re.search(sector_regex, web_pages["stock_profile_as_text"]).group(2)
+        extracted_industry = re.search(industry_regex, web_pages["stock_profile_as_text"]).group(2)
         
-        #extracted_country = re.search(country_regex, profile).groups()
-
-       # extracted_country = extracted_country[-2] if extracted_country[-2] != None else extracted_country[-5] 
-        extracted_country = re.search(country_regex, profile).group(2)
+       
+        extracted_country = re.search(country_regex, web_pages["stock_profile_as_text"]).group(2)
         stock_info["country"] = extracted_country
         stock_info["sector"] = extracted_sector
         stock_info["industry"] = extracted_industry
-        stock_info["currency"] = extracted_currency.upper()
+        stock_info["currency"] = extracted_currency
         stock_info["current_price"] = float(extracted_price.replace(",", "")) if extracted_price != "N/A" else np.NaN
         stock_info["target_price"] = float(exracted_target_price.replace(",", "")) if exracted_target_price != "N/A" else np.NaN
         stock_info["dividend_yield"] = extracted_dividend_yield if extracted_dividend_yield != "N/A" else np.NaN
-        stock_info["pb_ratio"] = re.search(pb_ratio_regex, summary).group(3)
-        pe_ratio_search = re.search(pe_ratio_regex, summary)
-        stock_info["pe_ratio"] = pe_ratio_search.group(3) if pe_ratio_search != None else np.NaN
-        stock_info["analyst_rating"] = self.scraper_get_stock_rating(ticker)
+        stock_info["pb_ratio"] = float(re.search(pb_ratio_regex, web_pages["statistics_as_text"]).group(2))
+        trailing_pe_ratio_search = re.search(trailing_pe_ratio_regex, web_pages["stock_summary_as_text"])
+        stock_info["trailing_pe_ratio"] = float(trailing_pe_ratio_search.group(2)) if trailing_pe_ratio_search != None else np.NaN
+        stock_info["five_year_expected_peg_ratio"] = float(re.search(five_year_expected_peg_ratio_regex, web_pages["statistics_as_text"]).group(2))
         return stock_info
-    
-    '''Large values are represented in shorthand with B for billion and M for million.
-    This converts them to the actual values'''
-    def scraper_convert_to_shorthand_number_to_real_number(self,value):
-        if "M" in value:
-            return float(value.replace("M", "")) * 1000000
-        elif "B" in value:
-            return float(value.replace("B", "")) * 1000000000
-        else:
-            return float(value)
+    def scraper_update_ticker(self,ticker_index,tickers_dataframe):
+        summary = self.scraper_get_web_page(f"https://finance.yahoo.com/quote/{tickers_dataframe.at[ticker_index, 'ticker']}").text
+        profile = self.scraper_get_web_page(f"https://finance.yahoo.com/quote/{tickers_dataframe.at[ticker_index, 'ticker']}/profile?p={tickers_dataframe.at[ticker_index, 'ticker']}").text
+        chart = self.scraper_get_web_page(f"https://finance.yahoo.com/quote/{tickers_dataframe.at[ticker_index, 'ticker']}/chart?nn=1").text
+        statistics = self.scraper_get_web_page(f"https://finance.yahoo.com/quote/{tickers_dataframe.at[ticker_index, 'ticker']}/key-statistics/").text
+
+        stock_info_as_dict = self.scraper_extract_web_info_to_dict(stock_chart_page_as_text=chart,stock_profile_as_text=profile,stock_summary_as_text=summary, statistics_as_text=statistics)
+        stock_info_as_dict =  self.scraper_get_stock_rating(tickers_dataframe.at[ticker_index, 'ticker'],stock_info_as_dict)
+        self.scraper_update_ticker_with_gathered_info(tickers_dataframe,stock_info_as_dict,ticker_index)
     def scraper_get_value_in_ref_currency(self,value,stock_info):
         return self.conversion_factors[stock_info["currency"]] * self.scraper_convert_to_shorthand_number_to_real_number(value)
     
-    def scraper_update_ticker(self,df,updated_info,index): 
-        df.at[index,'country']=updated_info["country"]
-        df.at[index,'currency']=updated_info["currency"]
-        df.at[index,'sector']=updated_info["sector"]
-        df.at[index,'industry']=updated_info["industry"]
-        df.at[index,'target_price']=updated_info["target_price"]
-        df.at[index,'current_price']= updated_info["current_price"] if updated_info["current_price"] != "N/A" else np.NaN
-        df.at[index,'target_price']= updated_info["target_price"]
-        df.at[index,'pb_ratio']=updated_info["pb_ratio"]
-        df.at[index,'pe_ratio']=updated_info["pe_ratio"]
-        df.at[index,'analyst_rating']=updated_info["analyst_rating"]
-    def scraper_update_ticker_info(self,path):
+    def scraper_update_ticker_with_gathered_info(self,tickers_dataframe,updated_ticker_info_dict,index):
+        for ticker_info in updated_ticker_info_dict:
+            tickers_dataframe.at[index,ticker_info] = updated_ticker_info_dict[ticker_info]
+
+    def scraper_update_tickers(self,path):
         tickers = pd.read_csv(path)
-        
-              
         for ticker_index in tickers.index:
             print(f"Scraping {tickers.at[ticker_index, 'ticker']}")
-            ticker_info = self.scraper_all_item_info(tickers.at[ticker_index, "ticker"])
-            self.scraper_update_ticker(tickers,ticker_info,ticker_index)
+            self.scraper_update_ticker(ticker_index,tickers)
             '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
             we would for each iteration append a coulumn to the df when writing it out'''
+            print(tickers)
         tickers.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv",index=False)
         print("Completed webscrape successfully")
 
 
-    def scraper_get_stock_rating(self,ticker):
+    def scraper_get_stock_rating(self,ticker,updated_ticker_info_dict):
         ticker = ticker.split(".", 1)[0].replace("-", "_")
         ticker_info = r.get(f"https://www.tradingview.com/symbols/{ticker}/", headers=headers).text
-        return re.search(analyst_rating_regex,ticker_info).group(2)
+        updated_ticker_info_dict['analyst_rating'] = re.search(analyst_rating_regex,ticker_info).group(2)
+        return  updated_ticker_info_dict
    
             
     

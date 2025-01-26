@@ -9,6 +9,7 @@ from StockScraper import *
 from StockProf import StockProfiler
 from StockAnalyzer import StockAnalyzer
 attr_index_mapping = {'ticker':0,'currency':1, 'current_price':2, 'initial_price':3, 'holding':4,'alert_threshold':5}
+ticker_attributes = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'target_price','sector','industry', 'country','analyst_rating', 'pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin']
 class StockScrapeConfig:
     def setup_scraper_script(self):
         os = platform.system()
@@ -28,18 +29,18 @@ class StockScrapeConfig:
         os.chdir("stockscraper_config")
         with open('config_info.json', 'w') as f:
             json.dump({"error_state": False, 'ref_currency':ref_currency.upper(), "row_id": None},f)
-        tickers = pd.DataFrame(columns = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'target_price','sector','industry', 'country','analyst_rating', 'pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin'])
+        tickers = pd.DataFrame(columns = ticker_attributes)
         tickers.to_csv('items.csv',index=False)
         holding_value = pd.DataFrame(columns = ['holding_value'])
         holding_value.to_csv('returns.csv',index=False)
     
     def config_extract_provided_values(self, args_as_dict):
         
-        tikr_values = [[np.NaN, "undef", np.NaN, np.NaN, np.NaN, np.NaN,np.NaN,"undef","undef", "undef", "undef",np.NaN,np.NaN,np.NaN,np.NaN,np.NaN,np.NaN]]
+        tikr_values = [[np.nan, "undef", np.nan, np.nan, np.nan, np.nan,np.nan,"undef","undef", "undef", "undef",np.nan,np.nan,np.nan,np.nan,np.nan,np.nan]]
         for argument in  args_as_dict:
            if argument in attr_index_mapping:
               tikr_values[0][attr_index_mapping[argument]] = args_as_dict[argument]
-        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'alert_threshold', 'target_price','sector','industry', 'country','analyst_rating','pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin'])      
+        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'target_price','sector','industry', 'country','analyst_rating','pb_ratio','trailing_pe_ratio','five_year_expected_peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin'])      
         return tikr_values
                     
         
@@ -73,10 +74,10 @@ def main():
     '''Default values are set to undef, rather than N/A, because if you do, then when pandas 
     reads it in, it will intepret it as NaN, causing incompatability issues'''
     parser.add_argument('--currency', action="store", required=False, default="undef")
-    parser.add_argument('--current_price', action="store", required=False, default=np.NAN)
-    parser.add_argument('--initial_price', action="store", required=False, default=np.NAN)
-    parser.add_argument('--holding', action="store", required=False, default=np.NAN)
-    parser.add_argument('--alert_threshold', action="store", required=False, default=np.NAN)
+    parser.add_argument('--current_price', action="store", required=False, default=np.nan)
+    parser.add_argument('--initial_price', action="store", required=False, default=np.nan)
+    parser.add_argument('--holding', action="store", required=False, default=np.nan)
+    parser.add_argument('--alert_threshold', action="store", required=False, default=np.nan)
     parser.add_argument('--overwrite', action="store_true", default=False)
     parser.add_argument('--ref_currency', action="store", default=False)
     parser.add_argument('--advanced_webscrape',action="store_true")
@@ -116,7 +117,7 @@ def main():
         already run a config setup.'''
     elif args.update_items:
         scraper = StockScraper()
-        scraper.scraper_update_ticker_info(f"{os.path.expanduser('~')}/stockscraper_config/items.csv")
+        scraper.scraper_update_tickers(f"{os.path.expanduser('~')}/stockscraper_config/items.csv")
     elif args.compute_returns:
         scraper = StockScraper()
         scraper.scraper_get_daily_returns()

@@ -1,6 +1,5 @@
-from sklearn import tree
+'''
 from sklearn import model_selection
-import numpy as np
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.ensemble import RandomForestClassifier
@@ -11,9 +10,26 @@ import os
 import pickle
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
-from sklearn import preprocessing
-class StockAnalyzer:
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import make_column_transformer
+from sklearn.preprocessing import LabelEncoder
+
+import numpy as np
+
+from sklearn.compose import ColumnTransformer
+from sklearn.datasets import fetch_openml
+from sklearn.feature_selection import SelectPercentile, chi2
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+'''
+from StockScraper import *
+columns_to_drop = ["ticker", "holding", "initial_price"]
+class StockAnalyzer(StockScraper):
     def __init__(self, autotrain_model=False,use_portfolio_for_training=False):
+        super().__init__()
         self.use_portfolio_for_training = use_portfolio_for_training
         self.training_data = None
         self.userhome = os.path.expanduser('~') 
@@ -34,7 +50,7 @@ class StockAnalyzer:
         except:
             print("yo mama")
         random_forest = RandomForestClassifier()
-        random_forest.fit(training_data, training_data_labels)
+        random_forest.fit(training_data.values, training_data_labels.values)
         with open(f"{os.path.expanduser('~')}/stockscraper_config/best_model.pkl", 'wb') as f:  # open a text file
             pickle.dump(random_forest, f) 
                 
@@ -53,7 +69,15 @@ class StockAnalyzer:
             "Sell"  
             
     def stock_analyzer_predict(self,ticker):
-        return  self.stock_analyser_map_num_rating_to_str_rating(self.decision_tree.predict(ticker))
+        stock_rating = self.scraper_get_stock_rating(ticker)
+        model = pickle.load(f"{os.path.expanduser('~')}/stockscraper_config/best_model.pkl")
+        ticker_info = self.scraper_all_item_info(ticker)
+        ticker_info_as_dict = {}
+        for ticker_info in ticker_attributes:
+            ticker_info_as_dict[ticker_info] = ticker_info[ticker_info]
+        ticker_info = ticker_info_as_dict.values()
+        return model.predict(ticker_info)
+        
     '''While the stocks have a discrete rating e.g Strong buy, buy, hold etc.
     they also have related  fuzzyness to them e.g how strong a buy, sell hold rating they have. '''
     def stock_analyser_fit_returns_function(self, dates_as_offsets, holding_values):
@@ -81,20 +105,21 @@ class StockAnalyzer:
         ticker_information = ticker_information.pop('analyst_rating', None).values
         predicted_ticker_rating =  self.random_forest.predict(ticker_information)
         
-    def stock_analyzer_encode_columns_to_numerical(self,df):
-        for column in df.columns:
-            if not is_numeric_dtype(df[column]):
-                one_hot = pd.get_dummies(df[column])
-                df = df.drop(column,axis = 1)
-                df = pd.concat([df, one_hot], axis=1)
-        return df
-    def stock_analyzer_encode_training_data(self):
-        stock_data = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv")
-        stock_data = stock_data.drop_duplicates(subset=['ticker'])
-        analyst_rating_labels = stock_data[["analyst_rating"]].copy()
-        stock_data.drop("analyst_rating", axis=1)
-        stock_data_encoded = self.stock_analyzer_encode_columns_to_numerical(stock_data)
-        le = preprocessing.LabelEncoder()
-        analyst_rating_labels['analyst_rating'] = le.fit_transform(analyst_rating_labels['analyst_rating'] )
-        stock_data_encoded.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data.csv")
-        analyst_rating_labels.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data_labels.csv")
+    def stock_analyser_encode_columns(self, tickers):
+        numeric_features =  list(tickers.select_dtypes(include='number'))
+        numeric_transformer = Pipeline(
+        steps=[("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())]
+        )
+        categorical_features = list(tickers.select_dtypes(include='string'))
+        categorical_transformer = Pipeline(
+            steps=[
+        ("encoder", OneHotEncoder(handle_unknown="ignore")),
+        ("selector", SelectPercentile(chi2, percentile=50)),
+        ]
+        )
+        assert len(numeric_features) + len(categorical_features) == len(tickers.columns), "Some columns types are likely not considered during encdoing of training data"
+        
+    def stock_analyser_encode_training_data(self):
+        tickers = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv")
+        tickers = tickers.drop(columns_to_drop,axis=1)
+        encoded_ticker_data = self.stock_analyser_encode_columns(tickers)
