@@ -8,8 +8,10 @@ import numpy as np
 from StockScraper import *
 from StockProf import StockProfiler
 from StockAnalyzer import StockAnalyzer
+default_categorical_column_value = "undef"
 attr_index_mapping = {'ticker':0,'currency':1, 'current_price':2, 'initial_price':3, 'holding':4,'alert_threshold':5}
 ticker_attributes = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'target_price','sector','industry', 'country','analyst_rating', 'pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin']
+columns_to_be_categorical = ["ticker", "currency", "sector", "industry", "country", "analyst_rating"]
 class StockScrapeConfig:
     def setup_scraper_script(self):
         os = platform.system()
@@ -30,17 +32,19 @@ class StockScrapeConfig:
         with open('config_info.json', 'w') as f:
             json.dump({"error_state": False, 'ref_currency':ref_currency.upper(), "row_id": None},f)
         tickers = pd.DataFrame(columns = ticker_attributes)
+       # '''Surprisingly, pandas isn't smart enough to piece together that a column with string values '''
+       # for column in columns_to_be_categorical:
+       #     tickers[column] = tickers[column].astype('category')
         tickers.to_csv('items.csv',index=False)
         holding_value = pd.DataFrame(columns = ['holding_value'])
         holding_value.to_csv('returns.csv',index=False)
     
-    def config_extract_provided_values(self, args_as_dict):
-        
-        tikr_values = [[np.nan, "undef", np.nan, np.nan, np.nan, np.nan,np.nan,"undef","undef", "undef", "undef",np.nan,np.nan,np.nan,np.nan,np.nan,np.nan]]
-        for argument in  args_as_dict:
-           if argument in attr_index_mapping:
-              tikr_values[0][attr_index_mapping[argument]] = args_as_dict[argument]
-        tikr_values = pd.DataFrame(tikr_values, columns=['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'target_price','sector','industry', 'country','analyst_rating','pb_ratio','trailing_pe_ratio','five_year_expected_peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin'])      
+    def config_extract_provided_values(self, provided_ticker_information: dict) -> pd.DataFrame:       
+        added_ticker_info = {"ticker": default_categorical_column_value, "currency":default_categorical_column_value, "current_price": np.nan, "initial_price": np.nan, "holding": np.nan, "target_price": np.nan, "sector": default_categorical_column_value, "industry":default_categorical_column_value  , "country":default_categorical_column_value, "analyst_rating":default_categorical_column_value}     
+        for ticker_info in provided_ticker_information:
+            if ticker_info in added_ticker_info:
+                added_ticker_info[ticker_info] = provided_ticker_information[ticker_info]
+        tikr_values = pd.DataFrame([added_ticker_info])
         return tikr_values
                     
         

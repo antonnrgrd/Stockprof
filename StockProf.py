@@ -7,7 +7,7 @@ import json
 import math
 from StockScraper import *
 import subprocess
-from sklearn.tree import export_graphviz
+
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
 one_month_tickinfo_regex = "^07-|^14-|^21-|^01|^01-01"
 six_months_tickinfo_regex = "^14-|^01|^01-01"
@@ -429,7 +429,7 @@ class StockProfiler:
         userhome = os.path.expanduser('~')          
         if os.path.isfile(f"{userhome}/stockscraper_config/items.csv"):
             tickers =  pd.read_csv(f"{userhome}/stockscraper_config/items.csv")
-            self.scraper.scraper_get_currency_conv_factors(tickers)
+            self.conversion_factors = self.scraper.scraper_get_currency_conv_factors(tickers)
             self.profiler_sanitize_ticker_data(tickers)
             tickers['returns'] = tickers.initial_price / tickers.current_price
             with open("{}/stockscraper_config/{}.tex".format(userhome, self.title), 'w') as report:

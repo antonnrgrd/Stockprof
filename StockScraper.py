@@ -9,7 +9,6 @@ import datetime
 import random
 import math
 from concurrent.futures import ThreadPoolExecutor
-from bs4 import BeautifulSoup
 currency_regex = r"(currencyCode\\\":\\\")([A-Za-z]+)"
 currency_subregex_first_case = "(Currency\sin\s)([A-Za-z]+)\s\([0-9,]+\.[0-9]+\s([A-Z]+)\)"
 currency_subregex_second_case = "(Currency\sin\s)([A-Z]+)"
@@ -28,7 +27,7 @@ we in the html code need to look for the adress, ending with the country in ques
 hyphen, punction, whitespace etc. so you need to be super general with what you are looking for.'''
 country_regex = r"(country\\\":\\\")([a-zA-Z&\s]+)"
 ex_rate_regex = "(Converted\sto<\/label><div>)([0-9\.+]+)(<)"
-analyst_rating_regex = "(analysis\sshows\sthe\s)([a-z|\s]+)(\stoday)"
+analyst_rating_regex =  r"technincal\sanalysis\sshows\sthe\s(strong\sbuy\srating|buy|neutral|sell|strong\ssell)"
 pb_ratio_regex=r"(Price\/Book<\/td>\s<td\sclass=\"yf-kbx2lo\">)([0-9\.,]+)"
 trailing_pe_ratio_regex=r"(\"trailingPE\"\sclass=\"yf-wk1sm9\">)([0-9\.]+)"
 five_year_expected_peg_ratio_regex = r"(PEG\sRatio\s\(5yr\sexpected\)</td>\s<td\sclass=\"yf-kbx2lo\">)([0-9\.,]+)"
@@ -73,7 +72,7 @@ class StockScraper:
         tickers = pd.read_csv("items.csv")
         with open(f"{userhome}\\stockscraper_config\\config_info.json") as f:
                 config_info = json.load(f)
-                self.scraper_get_currency_conv_factors(tickers, self.conversion_factors, config_info["ref_currency"])
+                self.conversion_factors = self.scraper_get_currency_conv_factors(tickers, self.conversion_factors, config_info["ref_currency"])
         '''Okay so this is a bit of a headache, we read in with index 0 as the first column is the date column, i,e our index
         but in the edge case we have no value, the result is an empty df so we need to re-create it.'''
         returns = pd.read_csv("returns.csv",index_col=0)
@@ -88,18 +87,20 @@ class StockScraper:
         returns.index.name = "date"
         returns = returns.reset_index()
         returns.to_csv("returns.csv",index=False)
-    def scraper_get_currency_conv_factors(self,tickers):
+    def scraper_get_currency_conv_factors(self,tickers:pd.DataFrame) -> dict:
         currencies = tickers.currency.unique()
         '''We cannot get the conversion factor for the reference currency, so we leave it out of the web scraping as getting
         the conversion factor for the currency itself leads to errors'''
         currencies = currencies[currencies != self.reference_currency]
+        conversion_factors = dict()
         for currency in currencies:
             conversion_factor_text = r.get("https://wise.com/us/currency-converter/{currency}-to-{reference_currency}-rate?amount=1".format(currency=currency, reference_currency=self.reference_currency)).text
             factor = float(re.search(ex_rate_regex,conversion_factor_text).group(2).replace(",",""))
-            self.conversion_factors[currency]=factor
+            conversion_factors[currency]=factor
         '''We include the conversion factor of the reference currency ( i.e 1), since it allow us to skimp on a lot of logic
         when converting the currencies to the reference currency'''
-        self.conversion_factors[self.reference_currency] = 1
+        conversion_factors[self.reference_currency] = 1
+        return conversion_factors
     
     def scraper_get_web_page(self,url:str)  -> r.Response:  
         web_page_response = r.get(url, headers=headers)
@@ -138,10 +139,10 @@ class StockScraper:
         stock_info["currency"] = extracted_currency
         stock_info["current_price"] = float(extracted_price.replace(",", "")) if extracted_price != "N/A" else np.NaN
         stock_info["target_price"] = float(exracted_target_price.replace(",", "")) if exracted_target_price != "N/A" else np.NaN
-        stock_info["dividend_yield"] = extracted_dividend_yield if extracted_dividend_yield != "N/A" else np.NaN
+        stock_info["dividend_yield"] = float(extracted_dividend_yield) if extracted_dividend_yield != "N/A" else np.NaN
         stock_info["pb_ratio"] = float(re.search(pb_ratio_regex, web_pages["statistics_as_text"]).group(2))
         trailing_pe_ratio_search = re.search(trailing_pe_ratio_regex, web_pages["stock_summary_as_text"])
-        stock_info["trailing_pe_ratio"] = float(trailing_pe_ratio_search.group(2)) if trailing_pe_ratio_search != None else np.NaN
+        stock_info["trailing_pe_ratio"] = float(trailing_pe_ratio_search.group(2)) if trailing_pe_ratio_search != None else np.nan
         stock_info["five_year_expected_peg_ratio"] = float(re.search(five_year_expected_peg_ratio_regex, web_pages["statistics_as_text"]).group(2))
         return stock_info
     def scraper_update_ticker(self,ticker_index,tickers_dataframe):
@@ -167,18 +168,21 @@ class StockScraper:
             self.scraper_update_ticker(ticker_index,tickers)
             '''This time, when updating the tickers, it is important to tell we do not want to save the indexes as a coluumn, because each how we read it it
             we would for each iteration append a coulumn to the df when writing it out'''
-            print(tickers)
         tickers.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv",index=False)
         print("Completed webscrape successfully")
 
 
     def scraper_get_stock_rating(self,ticker,updated_ticker_info_dict):
         ticker = ticker.split(".", 1)[0].replace("-", "_")
-        ticker_info = r.get(f"https://www.tradingview.com/symbols/{ticker}/", headers=headers).text
-        updated_ticker_info_dict['analyst_rating'] = re.search(analyst_rating_regex,ticker_info).group(2)
+        ticker_info = r.get(f"https://www.tradingview.com/symbols/{ticker}", headers=headers).text
+        rating_search = re.findall(analyst_rating_regex, ticker_info)
+        if rating_search:     
+            updated_ticker_info_dict['analyst_rating'] = rating_search[0]
+        else:
+            updated_ticker_info_dict['analyst_rating'] = "unknown"
         return  updated_ticker_info_dict
    
-            
+
     
     def scraper_advanced_update_ticker_info(self, tickers_df,index,advanced_updated_info):
         tickers_df.at[index,'pb_ratio'] = advanced_updated_info['pb_ratio']
