@@ -4,13 +4,13 @@ from StockScraper import StockScraper
 import os
 import pickle
 import pandas as pd
-from sklearn.preprocessing import LabelBinarizer
-
+from  sklearn.preprocessing import LabelBinarizer
+from keras.layers import LeakyReLU
 
 
 
 from StockScraper import *
-from tensorflow.keras.utils import to_categorical
+import tensorflow as tf
 columns_to_drop = ["ticker", "holding", "initial_price"]
 class StockAnalyzer(StockScraper):
     def __init__(self, autotrain_model=False,use_portfolio_for_training=False):
@@ -26,18 +26,7 @@ class StockAnalyzer(StockScraper):
         else:
             self.random_forest = None
         self.scraper = StockScraper()
-    def stock_analyzer_train_model(self):
-        training_data = None
-        training_data_labels = None
-        try:
-            training_data = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data.csv")
-            training_data_labels = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data_labels.csv")
-        except:
-            print("yo mama")
-        random_forest = RandomForestClassifier()
-        random_forest.fit(training_data.values, training_data_labels.values)
-        with open(f"{os.path.expanduser('~')}/stockscraper_config/best_model.pkl", 'wb') as f:  # open a text file
-            pickle.dump(random_forest, f) 
+
                 
             
     def stock_analyzer_predict(self,ticker):
@@ -61,17 +50,31 @@ class StockAnalyzer(StockScraper):
         predicted_ticker_rating =  self.random_forest.predict(ticker_information)
       
     @classmethod
-    def stock_analyzer_map_categorical_to_numerical(self, tickers : pd.DataFrame) -> pd.DataFrame:
-        catergorical_columns = list(tickers.select_dtypes(include=['object']))
+    def stock_analyzer_map_categorical_to_numerical(self, tickers : pd.DataFrame) -> dict:
+
         binarizer = LabelBinarizer()
-        for categorical_column in catergorical_columns:
-            tickers[categorical_column] = list(binarizer.fit_transform(tickers[categorical_column]))
-        return tickers
+        training_data_labels = binarizer.fit_transform(tickers["analyst_rating"].values)
+        tickers.drop(["analyst_rating"], inplace=True, axis=1)
+        training_data = pd.get_dummies(tickers, dtype=int).values
+                                                   
+        #catergorical_columns = list(tickers.select_dtypes(include=['object']))
+       # for column in catergorical_columns:
+        #    label_binarizer.fit(tickers[column].values)
+        #    tickers[f"{column}_encoded"] = list(label_binarizer.transform(tickers[column].values))
+        #    tickers.drop([column], inplace=True, axis=1)
+       # training_data  = tickers.loc[:, tickers.columns != 'analyst_rating_encoded'].values
+       # training_data_labels = tickers["analyst_rating_encoded"].values
+        return {'training_data': training_data, 'training_data_labels':training_data_labels}
     
-    def stock_analyser_define_model(self):
-        model = keras.keras.Sequential()
-        
-        model.compile(optimizer="adam",loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+    def stock_analyser_define_model(self,num_classes, input_size):
+        model = tf.keras.Sequential()
+        model.add(tf.keras.layers.Dense(input_size, activation=LeakyReLU()))
+        model.add(tf.keras.layers.Dense(512, activation=LeakyReLU()))
+        model.add(tf.keras.layers.Dense(512, activation=LeakyReLU()))
+        model.add(tf.keras.layers.Dense(512, activation=LeakyReLU()))
+        model.add(tf.keras.layers.Dense(512, activation=LeakyReLU()))
+        model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
+        model.compile(optimizer="adam",loss="categorical_crossentropy", metrics=["accuracy"])
         
         return model
     def stock_analyzer_train_model(self):
@@ -79,11 +82,9 @@ class StockAnalyzer(StockScraper):
         
         tickers = tickers.drop(columns_to_drop, axis=1)
         
-        tickers_encoded = self.stock_analyzer_map_categorical_to_numerical(tickers)
-        #tickers.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/training_data_encoded.csv")
-        
-        model = self.stock_analyser_define_model()
-        model.fit(,epochs = 300)
+        training_data = self.stock_analyzer_map_categorical_to_numerical(tickers)
+        model = self.stock_analyser_define_model(training_data['training_data_labels'].shape[1],training_data['training_data'].shape[1])
+        model.fit(training_data['training_data'], training_data['training_data_labels'],epochs = 300, validation_split=0.2)
         
     def stock_analyzer_encode_training_data(self):
         tickers = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv")

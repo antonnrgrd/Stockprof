@@ -10,7 +10,7 @@ from StockProf import StockProfiler
 from StockAnalyzer import StockAnalyzer
 default_categorical_column_value = "undef"
 attr_index_mapping = {'ticker':0,'currency':1, 'current_price':2, 'initial_price':3, 'holding':4,'alert_threshold':5}
-ticker_attributes = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'target_price','sector','industry', 'country','analyst_rating', 'pb_ratio','pe_ratio','peg_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin']
+ticker_attributes = ['ticker', 'currency', 'current_price', 'initial_price', 'holding', 'target_price','sector','industry', 'country','analyst_rating', 'pb_ratio','trailing_pe_ratio','ev_ebitda_ratio','market_cap_in_ref_currency','profit_margin','five_year_expected_peg_ratio']
 columns_to_be_categorical = ["ticker", "currency", "sector", "industry", "country", "analyst_rating"]
 class StockScrapeConfig:
     def setup_scraper_script(self):
