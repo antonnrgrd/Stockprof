@@ -59,6 +59,19 @@ class StockScrapeConfig:
         tickers = pd.read_csv("items.csv")
         tickers =  pd.concat([self.config_extract_provided_values(args_as_dict), tickers],ignore_index=True)
         tickers.to_csv("items.csv",index=False)
+    def config_add_items_from_file(self,filepath: str) -> None:
+        print(f"Adding tickers to investments from {filepath}")
+        with open(filepath, 'r') as tickers_to_be_added:
+            ticker_ids = []
+            for ticker in tickers_to_be_added:
+                ticker_ids.append(ticker.strip("\n"))
+            tickers = pd.read_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv")           
+            new_tickers = pd.DataFrame.from_dict({'ticker': ticker_ids, "currency": [default_categorical_column_value] * len(ticker_ids), "current_price": [np.nan]  * len(ticker_ids) , "initial_price": [np.nan]  * len(ticker_ids), "holding": np.nan, "target_price": [np.nan]  * len(ticker_ids), "sector": [default_categorical_column_value] * len(ticker_ids), "industry":[default_categorical_column_value] * len(ticker_ids)  , "country":[default_categorical_column_value] * len(ticker_ids), "analyst_rating":[default_categorical_column_value] * len(ticker_ids) })
+            tickers = pd.concat([new_tickers, tickers],ignore_index=True)
+            tickers.to_csv(f"{os.path.expanduser('~')}/stockscraper_config/items.csv",index=False)
+        print("Successfully added tickers provided via file")
+            
+            
 
                 
 
@@ -87,6 +100,7 @@ def main():
     parser.add_argument('--advanced_webscrape',action="store_true")
     parser.add_argument('--use_default_trainingset',action="store_true")
     parser.add_argument('--target_stock',action="store_true")
+    parser.add_argument('--filepath',action="store")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--update_items', action="store_true")
     group.add_argument('--additem', action="store_true")
@@ -97,6 +111,7 @@ def main():
     group.add_argument('--encode_training_data',action="store_true")
     group.add_argument('--train_model',action="store_true")
     group.add_argument('--get_stock_prediction',action="store_true")
+    group.add_argument('--add_items_from_file',action="store_true")
     args = parser.parse_args()
 
 
@@ -140,6 +155,9 @@ def main():
     elif args.train_model:
         trainer = StockAnalyzer(use_portfolio_for_training=True)
         trainer.stock_analyzer_train_model()
+    elif args.add_items_from_file:
+        config.config_add_items_from_file(args.filepath)
+        
     
          
             

@@ -11,7 +11,7 @@ from keras.layers import LeakyReLU
 
 from StockScraper import *
 import tensorflow as tf
-columns_to_drop = ["ticker", "holding", "initial_price"]
+columns_to_drop = ["ticker", "holding", "initial_price", "market_cap_in_ref_currency"]
 class StockAnalyzer(StockScraper):
     def __init__(self, autotrain_model=False,use_portfolio_for_training=False):
         super().__init__()

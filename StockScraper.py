@@ -33,6 +33,7 @@ pb_ratio_regex=r"(Price\/Book<\/td>\s<td\sclass=\"yf-kbx2lo\">)([0-9\.,]+)"
 trailing_pe_ratio_regex=r"(Trailing P/E</td> <td class=\"yf-kbx2lo\">)([0-9\.,]+)"
 five_year_expected_peg_ratio_regex = r"(PEG\sRatio\s\(5yr\sexpected\)</td>\s<td\sclass=\"yf-kbx2lo\">)([0-9\.,]+)"
 profit_margin_regex = r"(profitMargins\\\":{\\\"raw\\\":)([0-9\.]+)"
+#market_cap_regex = 
 #Yahoo finance seems to have upped their game a bit to circumvent webscraping, so the workaround is
 #adding this head info, curtesy to tsadigov from stackoverflow and reddit, that came with the workaround
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'}
